@@ -32,6 +32,8 @@ class SideMenu extends StatelessWidget {
                           padding: const EdgeInsets.only(right: 12),
                           child: Image.asset("assets/icons/logo.png"),
                         ),
+                        
+
                         const Flexible(
                           child: CustomText(
                             text: "Dashboard",
