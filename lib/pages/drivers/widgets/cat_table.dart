@@ -2,15 +2,36 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-class CatTable extends StatelessWidget {
+class CatTable extends StatefulWidget {
   const CatTable({Key? key}) : super(key: key);
 
+  @override
+  State<CatTable> createState() => _CatTableState();
+}
+
+class _CatTableState extends State<CatTable> {
   Future<List<dynamic>> fetchData() async {
     final response = await http.get(Uri.parse('http://127.0.0.1:1200/api/cat'));
     if (response.statusCode == 200) {
       return json.decode(response.body);
     } else {
       throw Exception('Failed to load data');
+    }
+  }
+
+  Future<void> toggleStatus(int categoryId) async {
+    final url = Uri.parse('http://127.0.0.1:1200/toggle-status/$categoryId/');
+
+    try {
+      final response = await http.post(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        print('Status updated: ${data['status']}');
+      } else {
+        print('Failed to toggle status: ${response.body}');
+      }
+    } catch (e) {
+      print('Error: $e');
     }
   }
 
@@ -79,24 +100,39 @@ class CatTable extends StatelessWidget {
                         style: const TextStyle(color: Colors.black))),
                     DataCell(Text('${cat['user_count']}',
                         style: const TextStyle(color: Colors.black))),
-                    DataCell(Container(
-                      decoration: BoxDecoration(
-                        color: cat['cat_used'] > 50
-                            ? Colors.green.withOpacity(0.2)
-                            : Colors.red.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                      child: Text(
-                        cat['cat_used'] > 50 ? 'Active' : 'Inactive',
-                        style: TextStyle(
-                          color:
-                              cat['cat_used'] > 50 ? Colors.green : Colors.red,
-                          fontWeight: FontWeight.bold,
+                    DataCell(
+                      GestureDetector(
+                        onTap: () async {
+                          int categoryId = cat[
+                              'cat_id']; // Assuming 'id' is present in your data
+                          await toggleStatus(categoryId); // Call the API
+                          // Reload or refresh the UI after the API call
+                          setState(() {
+                            cat['status'] =
+                                !cat['status']; // Toggle status locally
+                          });
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: cat['status'] == true
+                                ? Colors.green.withOpacity(0.2)
+                                : Colors.red.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 6),
+                          child: Text(
+                            cat['status'] == true ? 'Active' : 'Inactive',
+                            style: TextStyle(
+                              color: cat['status'] == true
+                                  ? Colors.green
+                                  : Colors.red,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ),
                       ),
-                    )),
+                    ),
                   ]);
                 },
               ),

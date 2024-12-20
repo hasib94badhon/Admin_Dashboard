@@ -4,15 +4,15 @@ from rest_framework.generics import ListCreateAPIView
 from rest_framework.response import Response
 from .models import *  
 from .serializers import *
-
+import pandas as pd
 
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-import os
 from ftplib import FTP
 from django.core.files.storage import FileSystemStorage
 from openpyxl import load_workbook
 from datetime import datetime
+from django.shortcuts import get_object_or_404
 
 
 # def data_view(request):
@@ -107,63 +107,92 @@ def insert_cat(request):
         return JsonResponse({"error": "Invalid request method"}, status=405)
 
 
-class UploadUsersView(View):
-    def options(self, request, *args, **kwargs):
-        """Respond to the CORS preflight request."""
-        response = JsonResponse({"message": "CORS preflight successful"})
-        response["Access-Control-Allow-Origin"] = "*"
-        response["Access-Control-Allow-Methods"] = "POST, OPTIONS"
-        response["Access-Control-Allow-Headers"] = "Content-Type, X-Requested-With"
-        return response
-    
-    def post(self, request, *args, **kwargs):
-        # Check if file is in request
-        excel_file = request.FILES.get("file")
-        if not excel_file:
-            return JsonResponse({"error": "No file uploaded"}, status=400)
+@csrf_exempt
+def upload_excel(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Only POST requests are allowed"}, status=405)
 
-        # Save and parse the file
-        # fs = FileSystemStorage(location="uploads/")
-        # filename = fs.save(excel_file.name, excel_file)
-        file = request.FILES['file']
+    if "file" not in request.FILES:
+        return JsonResponse({"error": "No file provided"}, status=400)
+
+    file = request.FILES["file"]
+
+    try:
+        # Save file temporarily
         fs = FileSystemStorage()
         filename = fs.save(file.name, file)
+        filepath = fs.path(filename)
 
-        try:
-            # Load and parse Excel file
-            workbook = load_workbook(filename)
-            sheet = workbook.active
+        # Read Excel file
+        data = pd.read_excel(filepath, sheet_name="data")
+        
+        # Process each row in the Excel file
+        for index, row in data.iterrows():
+            name = row.get("name", "").strip()
+            phone = row.get("phone", "")
+            cat_id = row.get("cat_id", None)
+            location = row.get("location", "").strip()
+            photo = row.get("photo", "").strip()
 
-            for row in sheet.iter_rows(min_row=2, values_only=True):  # Skip header row
-                name, phone, cat_id, location, photo = row
+            # Skip if name or phone is missing
+            if not name or not phone:
+                continue
 
-                # Ensure phone and name are not empty
-                if not phone or not name:
-                    continue
+            # Check if phone exists in Reg table
+            reg, created = Reg.objects.get_or_create(phone=phone, defaults={"name": name})
+            if created:
+                # If new record, set the default password and created_date
+                reg.password = "12345"
+                reg.save()
 
-                # Check if phone exists in reg table
-                reg, created = Reg.objects.get_or_create(
-                    phone=phone,
-                    defaults={
-                        "name": name,
-                        "password": "12345",  # Default password
-                        "created_time": datetime.now()
-                    }
-                )
-                # Insert data into users table
-                Users.objects.create(
-                    reg=reg,
-                    cat_id=cat_id if cat_id else None,
-                    name=name,
-                    phone=phone,
-                    location=location if location else "",
-                    photo=photo if photo else ""
-                )
+            # Find the Cat by ID
+            try:
+                cat = Cat.objects.get(cat_id=cat_id)
+            except Cat.DoesNotExist:
+                cat = None
 
-            return JsonResponse({"message": "Data inserted successfully"}, status=201)
+            # Insert data into Users table
+            Users.objects.create(
+                reg=reg,
+                cat=cat,
+                name=name,
+                phone=phone,
+                location=location,
+                photo=photo,
+                description="",
+                user_shared=0,
+                user_viewed=0,
+                user_called=0,
+                user_total_post=0,
+                user_logged_date=None
+            )
 
-        except Exception as e:
-            return JsonResponse({"error": str(e)}, status=500)
+        # Clean up uploaded file
+        fs.delete(filename)
 
-        finally:
-            fs.delete(filename) 
+        return JsonResponse({"message": "File processed successfully"}, status=201)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+@csrf_exempt
+def toggle_status(request, pk):
+    """
+    Toggle the status of a category.
+    :param request: The HTTP request object.
+    :param pk: The primary key of the category to toggle status.
+    """
+    if request.method == "POST":
+        category = get_object_or_404(Cat, pk=pk)
+        # Toggle status (1 becomes 0 and 0 becomes 1)
+        category.status = not category.status
+        category.save()
+
+        return JsonResponse({
+            "success": True,
+            "message": "Category status updated successfully.",
+            "id": category.cat_id,
+            "name": category.cat_name,
+            "status": category.status
+        }, status=200)
+    return JsonResponse({"error": "Invalid request method."}, status=400)

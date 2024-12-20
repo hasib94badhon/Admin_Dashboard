@@ -23,58 +23,72 @@ class _InsertPageState extends State<InsertPage> {
   TextEditingController catNameController = TextEditingController();
   html.File? selectedImage; // Store the selected image
   Uint8List? imageBytes; // Store image bytes for display
-  html.File? uploadedFile;
+  PlatformFile? selectedFile; // Store the file data
+  bool isUploading = false;
 
-  void pickFile() {
-    html.FileUploadInputElement uploadInput = html.FileUploadInputElement();
-    uploadInput.accept = ".xlsx, .xls";
-    uploadInput.click();
-    uploadInput.onChange.listen((e) {
-      final file = uploadInput.files!.first;
-      final reader = html.FileReader();
+// Function to pick an Excel file
+  Future<void> pickExcelFile() async {
+    FilePickerResult? result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['xlsx'], // Restrict to Excel files
+      withData: true, // Important: This ensures `bytes` is populated
+    );
 
-      reader.readAsArrayBuffer(file);
-      reader.onLoadEnd.listen((e) {
-        setState(() {
-          uploadedFile = file;
-        });
+    if (result != null && result.files.isNotEmpty) {
+      setState(() {
+        selectedFile = result.files.first; // Store the first file
       });
-    });
+    } else {
+      setState(() {
+        selectedFile = null;
+      });
+    }
   }
 
-  Future<void> uploadFile() async {
-    final formData = html.FormData();
-    formData.appendBlob('file', uploadedFile!);
-
-    final uri = Uri.parse("http://127.0.0.1:1200/upload-users/");
-    try {
-      final request = html.HttpRequest();
-      request.open("POST", uri.toString());
-      request.setRequestHeader("enctype", "multipart/form-data");
-
-      // Log request state
-      print("Sending request to $uri");
-
-      request.onLoadEnd.listen((event) {
-        if (request.status == 201) {
-          print("Success: ${request.responseText}");
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('File uploaded successfully!')),
-          );
-        } else {
-          print("Error ${request.status}: ${request.responseText}");
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Upload failed: ${request.responseText}')),
-          );
-        }
-      });
-
-      request.send(formData);
-    } catch (e) {
-      print("Request failed: $e");
+  // Function to upload the Excel file to the Django backend
+  Future<void> uploadExcelFile() async {
+    if (selectedFile == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
+        const SnackBar(content: Text("Please select an Excel file to upload.")),
       );
+      return;
+    }
+
+    setState(() {
+      isUploading = true;
+    });
+
+    final uri =
+        Uri.parse("http://127.0.0.1:1200/upload-users/"); // API endpoint
+    var request = http.MultipartRequest("POST", uri);
+
+    // Add file data as bytes
+    request.files.add(http.MultipartFile.fromBytes(
+      "file",
+      selectedFile!.bytes!, // Use `bytes` property for the web platform
+      filename: selectedFile!.name,
+    ));
+
+    try {
+      var response = await request.send();
+      if (response.statusCode == 201) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Data uploaded successfully!")),
+        );
+      } else {
+        var responseBody = await response.stream.bytesToString();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Upload failed: $responseBody")),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e")),
+      );
+    } finally {
+      setState(() {
+        isUploading = false;
+      });
     }
   }
 
@@ -194,19 +208,27 @@ class _InsertPageState extends State<InsertPage> {
         ),
         const SizedBox(height: 10),
         ElevatedButton.icon(
-          onPressed: pickFile,
+          onPressed: pickExcelFile,
           icon: const Icon(Icons.upload_file),
-          label: const Text("Upload Excel Sheet"),
+          label: const Text("Select Excel Sheet"),
         ),
         const SizedBox(height: 10),
+        selectedFile != null
+            ? Text(
+                "Selected File: ${selectedFile!.name}",
+                style: const TextStyle(color: Colors.green),
+              )
+            : const Text(
+                "No file selected",
+                style: TextStyle(color: Colors.red),
+              ),
+        const SizedBox(height: 20),
         ElevatedButton(
-          onPressed: uploadFile,
-          child: Container(
-            padding: EdgeInsets.all(8),
-            decoration: BoxDecoration(color: Colors.black38),
-            child: Text("PUSH"),
-          ),
-        )
+          onPressed: isUploading ? null : uploadExcelFile,
+          child: isUploading
+              ? const CircularProgressIndicator(color: Colors.white)
+              : const Text("Upload Data"),
+        ),
       ],
     );
   }

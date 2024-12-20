@@ -60,6 +60,8 @@ CORS_ALLOW_METHODS = [
     'OPTIONS',
 ]
 
+CORS_ALLOW_HEADERS = ["content-type"]
+
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',

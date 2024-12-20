@@ -108,10 +108,13 @@ class Cat(models.Model):
     cat_logo = models.CharField(max_length=255, blank=True, null=True)
     user_count = models.IntegerField(blank=True, null=True)
     cat_used = models.IntegerField(blank=True, null=True)
+    status = models.BooleanField(default=True)
 
     class Meta:
         managed = False
         db_table = 'cat'
+    def __str__(self):
+        return self.name
 
 
 class Comment(models.Model):
