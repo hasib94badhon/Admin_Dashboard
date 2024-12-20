@@ -3,9 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_web_dashboard/constants/style.dart';
 import 'package:flutter_web_dashboard/widgets/custom_text.dart';
 
-class Clientstable extends StatelessWidget {
+class Clientstable extends StatefulWidget {
   const Clientstable({super.key});
 
+  @override
+  State<Clientstable> createState() => _ClientstableState();
+}
+
+class _ClientstableState extends State<Clientstable> {
   @override
   Widget build(BuildContext context) {
     String selectedSort = 'Time'; // default sort option
@@ -24,8 +29,8 @@ class Clientstable extends StatelessWidget {
                     decoration: InputDecoration(
                       hintText: "Search by UserID",
                       filled: true,
-                      fillColor: light,
-                      prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                      fillColor: Colors.blue,
+                      prefixIcon: const Icon(Icons.search, color: Colors.black),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide.none,
@@ -41,7 +46,8 @@ class Clientstable extends StatelessWidget {
                   icon: const Icon(Icons.search, color: Colors.white),
                   label: const Text("Search"),
                   style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 15),
                     backgroundColor: active,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
@@ -52,7 +58,7 @@ class Clientstable extends StatelessWidget {
               ],
             ),
           ),
-          
+
           // Sorting Dropdowns
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -64,57 +70,62 @@ class Clientstable extends StatelessWidget {
                   child: DropdownButtonFormField<String>(
                     value: selectedSort,
                     decoration: InputDecoration(
-                      labelText: "Sort By",
+                      //labelText: "Sort By",
                       filled: true,
-                      fillColor: light,
+                      fillColor: Colors.green,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
                         borderSide: BorderSide.none,
                       ),
                     ),
                     items: const [
-                      DropdownMenuItem(value: 'Time', child: Text("Time")),
-                      DropdownMenuItem(value: 'Category', child: Text("Category")),
-                      DropdownMenuItem(value: 'User Type', child: Text("User Type")),
-                      DropdownMenuItem(value: 'User Called', child: Text("Max User Called")),
+                      DropdownMenuItem(
+                          value: 'Time', child: Text("Most recent")),
+                      DropdownMenuItem(
+                          value: 'Category', child: Text("Users by category")),
+                      DropdownMenuItem(
+                          value: 'User Type', child: Text("Paid/Free")),
+                      DropdownMenuItem(
+                          value: 'User Called',
+                          child: Text("Users by most called")),
                     ],
                     onChanged: (value) {
                       // Update sorting logic based on selected option
                     },
                   ),
                 ),
-                
+
                 // Conditional Time Sorting Options
-                const SizedBox(width: 12),
-                if (selectedSort == 'Time')
-                  Expanded(
-                    child: DropdownButtonFormField<String>(
-                      value: selectedTimeSort,
-                      decoration: InputDecoration(
-                        labelText: "Period",
-                        filled: true,
-                        fillColor: light,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                      items: const [
-                        DropdownMenuItem(value: 'Day', child: Text("Day")),
-                        DropdownMenuItem(value: 'Week', child: Text("Week")),
-                        DropdownMenuItem(value: 'Month', child: Text("Month")),
-                        DropdownMenuItem(value: 'Year', child: Text("Year")),
-                      ],
-                      onChanged: (value) {
-                        // Handle specific time sorting
-                      },
-                    ),
-                  ),
+                // const SizedBox(width: 12),
+                // if (selectedSort == 'Time')
+                //   Expanded(
+                //     child: DropdownButtonFormField<String>(
+                //       value: selectedTimeSort,
+                //       decoration: InputDecoration(
+                //         labelText: "Period",
+                //         filled: true,
+                //         fillColor: light,
+                //         border: OutlineInputBorder(
+                //           borderRadius: BorderRadius.circular(8),
+                //           borderSide: BorderSide.none,
+                //         ),
+                //       ),
+                //       items: const [
+                //         DropdownMenuItem(value: 'Day', child: Text("Day")),
+                //         DropdownMenuItem(value: 'Week', child: Text("Week")),
+                //         DropdownMenuItem(value: 'Month', child: Text("Month")),
+                //         DropdownMenuItem(value: 'Year', child: Text("Year")),
+                //       ],
+                //       onChanged: (value) {
+                //         // Handle specific time sorting
+                //       },
+                //     ),
+                //   ),
               ],
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // User Data Table
           Container(
             decoration: BoxDecoration(
@@ -185,61 +196,133 @@ class Clientstable extends StatelessWidget {
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(color: active, width: .5),
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
                         child: CustomText(
-                          text: index % 2 == 0 ? "Paid" : "Non-paid", // Toggle paid status
+                          text: index % 2 == 0
+                              ? "Paid"
+                              : "FREE", // Toggle paid status
                           color: active.withOpacity(.7),
                           weight: FontWeight.bold,
                         ),
                       )),
-                      DataCell(Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Row(
-                            children: [
-                              Radio<String>(
-                                value: "Play",
-                                groupValue: "Status", // Replace with a dynamic value for control
-                                onChanged: (value) {
-                                  // Handle Play status selection
-                                },
-                              ),
-                              const Text("Play"),
-                            ],
-                          ),
-                          Row(
-                            children: [
-                              Radio<String>(
-                                value: "Pause",
-                                groupValue: "Status",
-                                onChanged: (value) {
-                                  // Handle Pause status selection
-                                },
-                              ),
-                              const Text("Pause"),
-                            ],
-                          ),
-                          Row(
-                            children: [
-                              Radio<String>(
-                                value: "Stop",
-                                groupValue: "Status",
-                                onChanged: (value) {
-                                  // Handle Stop status selection
-                                },
-                              ),
-                              const Text("Stop"),
-                            ],
-                          ),
-                        ],
-                      )),
+                      DataCell(
+                        StatefulBuilder(
+                          builder: (context, setState) {
+                            // Variables to control button states
+                            bool isPlayActive =
+                                true; // Initial active button (Play or Pause)
+                            bool isDeleteLocked =
+                                true; // Initial state for Delete button safety lock
+
+                            return Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                // Play Button
+                                ElevatedButton.icon(
+                                  onPressed: isPlayActive
+                                      ? null
+                                      : () {
+                                          setState(() {
+                                            isPlayActive = true;
+                                          });
+                                          print("Play action triggered");
+                                        },
+                                  icon: const Icon(Icons.play_arrow),
+                                  label: const Text("Play"),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ).copyWith(
+                                    backgroundColor: MaterialStateProperty
+                                        .resolveWith<Color>(
+                                      (states) => isPlayActive
+                                          ? Colors.green
+                                          : Colors.green.withOpacity(0.5),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+
+                                // Pause Button
+                                ElevatedButton.icon(
+                                  onPressed: isPlayActive
+                                      ? () {
+                                          setState(() {
+                                            isPlayActive = false;
+                                          });
+                                          print("Pause action triggered");
+                                        }
+                                      : null,
+                                  icon: const Icon(Icons.pause),
+                                  label: const Text("Pause"),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blue,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ).copyWith(
+                                    backgroundColor: MaterialStateProperty
+                                        .resolveWith<Color>(
+                                      (states) => !isPlayActive
+                                          ? Colors.blue
+                                          : Colors.blue.withOpacity(0.5),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 10),
+
+                                // Delete Button
+                                ElevatedButton.icon(
+                                  onPressed: isDeleteLocked
+                                      ? () {
+                                          setState(() {
+                                            isDeleteLocked = false;
+                                          });
+                                          ScaffoldMessenger.of(context)
+                                              .showSnackBar(
+                                            const SnackBar(
+                                              content: Text(
+                                                  "Safety lock removed. Tap Delete to proceed."),
+                                            ),
+                                          );
+                                        }
+                                      : () {
+                                          print("Delete action triggered");
+                                        },
+                                  icon: Icon(
+                                    isDeleteLocked
+                                        ? Icons.lock
+                                        : Icons.delete_forever,
+                                  ),
+                                  label: Text(
+                                      isDeleteLocked ? "Unlock" : "Delete"),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: isDeleteLocked
+                                        ? Colors.grey
+                                        : Colors.red,
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      )
                     ],
                   ),
                 ),
               ),
             ),
           ),
-          
+
           // Download User Data Section
           Container(
             decoration: BoxDecoration(
@@ -274,7 +357,8 @@ class Clientstable extends StatelessWidget {
                           hintText: "Enter UserID",
                           filled: true,
                           fillColor: light,
-                          prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                          prefixIcon:
+                              const Icon(Icons.search, color: Colors.grey),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(8),
                             borderSide: BorderSide.none,
@@ -290,7 +374,8 @@ class Clientstable extends StatelessWidget {
                       icon: const Icon(Icons.download, color: Colors.white),
                       label: const Text("Download"),
                       style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 16),
                         backgroundColor: active,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8),
