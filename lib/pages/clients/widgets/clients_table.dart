@@ -1,6 +1,8 @@
 import 'package:data_table_2/data_table_2.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_web_dashboard/constants/style.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'package:flutter_web_dashboard/widgets/custom_text.dart';
 
 class Clientstable extends StatefulWidget {
@@ -11,10 +13,72 @@ class Clientstable extends StatefulWidget {
 }
 
 class _ClientstableState extends State<Clientstable> {
+  String selectedSort = 'Time'; // Default sort option
+  String searchUserID = ''; // Search field input
+  List<dynamic> userData = []; // List to store fetched user data
+  bool isLoading = false; // Loading state for data fetch
+
+  // Base URL of your API
+  final String apiUrl = 'http://127.0.0.1:1200/get-users/';
+
+  // Function to fetch and sort user data
+  Future<void> fetchData() async {
+    setState(() {
+      isLoading = true;
+    });
+
+    try {
+      // Build the query parameters based on sort selection
+      String sortQuery = '';
+      switch (selectedSort) {
+        case 'Time':
+          sortQuery = 'recent';
+          break;
+        case 'Category':
+          sortQuery = 'category';
+          break;
+        case 'User Type':
+          sortQuery = 'user_type';
+          break;
+        case 'User Called':
+          sortQuery = 'user_called';
+          break;
+      }
+
+      // API call
+      final response = await http.get(
+        Uri.parse(
+            '$apiUrl?sort=$sortQuery${searchUserID.isNotEmpty ? '&search=$searchUserID' : ''}'),
+      );
+
+      if (response.statusCode == 200) {
+        setState(() {
+          userData = json.decode(response.body)['users'];
+        });
+      } else {
+        throw Exception('Failed to fetch user data');
+      }
+    } catch (error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: ${error.toString()}')),
+      );
+    } finally {
+      setState(() {
+        isLoading = false;
+      });
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    fetchData(); // Initial fetch when the widget loads
+  }
+
   @override
   Widget build(BuildContext context) {
-    String selectedSort = 'Time'; // default sort option
-    String selectedTimeSort = 'Month'; // default time period for sorting
+    // String selectedSort = 'Time'; // default sort option
+    // String selectedTimeSort = 'Month'; // default time period for sorting
 
     return SingleChildScrollView(
       child: Column(
@@ -40,9 +104,7 @@ class _ClientstableState extends State<Clientstable> {
                 ),
                 const SizedBox(width: 12),
                 ElevatedButton.icon(
-                  onPressed: () {
-                    // Handle search functionality here
-                  },
+                  onPressed: fetchData,
                   icon: const Icon(Icons.search, color: Colors.white),
                   label: const Text("Search"),
                   style: ElevatedButton.styleFrom(
@@ -90,37 +152,13 @@ class _ClientstableState extends State<Clientstable> {
                           child: Text("Users by most called")),
                     ],
                     onChanged: (value) {
-                      // Update sorting logic based on selected option
+                      setState(() {
+                        selectedSort = value!;
+                      });
+                      fetchData(); // Fetch sorted data
                     },
                   ),
                 ),
-
-                // Conditional Time Sorting Options
-                // const SizedBox(width: 12),
-                // if (selectedSort == 'Time')
-                //   Expanded(
-                //     child: DropdownButtonFormField<String>(
-                //       value: selectedTimeSort,
-                //       decoration: InputDecoration(
-                //         labelText: "Period",
-                //         filled: true,
-                //         fillColor: light,
-                //         border: OutlineInputBorder(
-                //           borderRadius: BorderRadius.circular(8),
-                //           borderSide: BorderSide.none,
-                //         ),
-                //       ),
-                //       items: const [
-                //         DropdownMenuItem(value: 'Day', child: Text("Day")),
-                //         DropdownMenuItem(value: 'Week', child: Text("Week")),
-                //         DropdownMenuItem(value: 'Month', child: Text("Month")),
-                //         DropdownMenuItem(value: 'Year', child: Text("Year")),
-                //       ],
-                //       onChanged: (value) {
-                //         // Handle specific time sorting
-                //       },
-                //     ),
-                //   ),
               ],
             ),
           ),
@@ -169,12 +207,14 @@ class _ClientstableState extends State<Clientstable> {
                   ),
                 ],
                 rows: List<DataRow>.generate(
-                  15,
+                  userData.length,
                   (index) => DataRow(
                     cells: [
-                      const DataCell(CustomText(text: "UserID")),
-                      const DataCell(CustomText(text: "Category")),
-                      const DataCell(Row(
+                      DataCell(CustomText(
+                          text: userData[index]['user_id'].toString())),
+                      DataCell(CustomText(
+                          text: userData[index]['cat_id'].toString())),
+                      DataCell(Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
@@ -186,7 +226,7 @@ class _ClientstableState extends State<Clientstable> {
                             width: 5,
                           ),
                           CustomText(
-                            text: "0",
+                            text: userData[index]['user_called'].toString(),
                           )
                         ],
                       )),
@@ -199,9 +239,8 @@ class _ClientstableState extends State<Clientstable> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 6),
                         child: CustomText(
-                          text: index % 2 == 0
-                              ? "Paid"
-                              : "FREE", // Toggle paid status
+                          text: userData[index]
+                              ['user_type'], // Toggle paid status
                           color: active.withOpacity(.7),
                           weight: FontWeight.bold,
                         ),

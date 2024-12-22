@@ -196,3 +196,58 @@ def toggle_status(request, pk):
             "status": category.status
         }, status=200)
     return JsonResponse({"error": "Invalid request method."}, status=400)
+
+
+
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.db.models import Q
+from .models import Users
+
+@csrf_exempt
+def get_users(request):
+    """
+    API to fetch and sort Users data based on different criteria.
+    Query parameters:
+        - sort: Defines the sorting method ('recent', 'category', 'user_type', 'user_called').
+        - category: (Optional) Filter users by a specific category ID.
+        - user_type: (Optional) Filter by user_type ('free' or 'paid').
+
+    """
+    if request.method == 'GET':
+        sort_by = request.GET.get('sort', 'recent')
+        category = request.GET.get('category', None)
+        user_type = request.GET.get('user_type', None)
+
+        users = Users.objects.all()
+
+        # Filter by category
+        if category:
+            users = users.filter(cat_id=category)
+
+        # Filter by user_type
+        if user_type:
+            users = users.filter(user_type=user_type)
+
+        # Sort by criteria
+        if sort_by == 'recent':
+            users = users.order_by('-user_logged_date')  # Most recent
+        elif sort_by == 'category':
+            users = users.order_by('cat_id')  # Sorted by category ID
+        elif sort_by == 'user_type':
+            users = users.order_by('user_type')  # Sorted by user type
+        elif sort_by == 'user_called':
+            users = users.order_by('-user_called')  # Highest to lowest calls
+        else:
+            return JsonResponse({'error': 'Invalid sort parameter'}, status=400)
+
+        # Format response
+        user_data = list(users.values(
+            'user_id', 'name', 'phone', 'description', 'location', 'photo',
+            'user_type', 'status', 'user_shared', 'user_viewed', 'user_called',
+            'user_total_post', 'user_logged_date', 'cat_id'
+        ))
+
+        return JsonResponse({'users': user_data}, status=200, safe=False)
+
+    return JsonResponse({'error': 'Invalid request method'}, status=405)

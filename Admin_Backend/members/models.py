@@ -288,6 +288,8 @@ class Users(models.Model):
     description = models.CharField(max_length=255)
     location = models.TextField()
     photo = models.CharField(max_length=255)
+    user_type = models.CharField(max_length=255)
+    status = models.BooleanField(default=True)
     user_shared = models.IntegerField()
     user_viewed = models.IntegerField()
     user_called = models.IntegerField()

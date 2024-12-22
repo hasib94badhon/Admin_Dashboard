@@ -10,6 +10,7 @@ urlpatterns = [
     path('api/count',CountAPIView.as_view(),name='count_list'),
     path('insert-cat/', insert_cat, name='insert_cat'),
     path('upload-users/', upload_excel, name='upload-users'),
-    path('toggle-status/<int:pk>/', toggle_status, name='toggle_status')
+    path('toggle-status/<int:pk>/', toggle_status, name='toggle_status'),
+    path('get-users/', get_users, name='get_users'),
     
 ]
