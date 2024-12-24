@@ -199,27 +199,50 @@ def toggle_status(request, pk):
 
 
 
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.db.models import Q
-from .models import Users
 
-@csrf_exempt
 def get_users(request):
     """
-    API to fetch and sort Users data based on different criteria.
+    API to fetch, search, and sort Users data based on different criteria.
     Query parameters:
         - sort: Defines the sorting method ('recent', 'category', 'user_type', 'user_called').
         - category: (Optional) Filter users by a specific category ID.
         - user_type: (Optional) Filter by user_type ('free' or 'paid').
-
+        - search: (Optional) Search for a user by user_id. Returns specific user data if provided.
     """
     if request.method == 'GET':
         sort_by = request.GET.get('sort', 'recent')
         category = request.GET.get('category', None)
         user_type = request.GET.get('user_type', None)
+        search = request.GET.get('search', None)  # Search by user_id
 
         users = Users.objects.all()
+
+        # Search by user_id: Fetch specific user data
+        # if search:
+        #     try:
+        #         user = users.get(user_id=search)
+        #         user_data = {
+        #             'user_id': user.user_id,
+        #             'name': user.name,
+        #             'phone': user.phone,
+        #             'description': user.description,
+        #             'location': user.location,
+        #             'photo': user.photo,
+        #             'user_type': user.user_type,
+        #             'status': user.status,
+        #             'user_shared': user.user_shared,
+        #             'user_viewed': user.user_viewed,
+        #             'user_called': user.user_called,
+        #             'user_total_post': user.user_total_post,
+        #             'user_logged_date': user.user_logged_date,
+        #             'cat_id': user.cat_id
+        #         }
+        #         return JsonResponse({'user': user_data}, status=200, safe=False)
+        #     except Users.DoesNotExist:
+        #         return JsonResponse({'error': 'User not found'}, status=404)
+
+        if search:
+            users = users.filter(user_id=search)
 
         # Filter by category
         if category:
@@ -241,7 +264,7 @@ def get_users(request):
         else:
             return JsonResponse({'error': 'Invalid sort parameter'}, status=400)
 
-        # Format response
+        # Format response for multiple users
         user_data = list(users.values(
             'user_id', 'name', 'phone', 'description', 'location', 'photo',
             'user_type', 'status', 'user_shared', 'user_viewed', 'user_called',
