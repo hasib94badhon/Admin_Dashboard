@@ -1,14 +1,15 @@
 import 'dart:io';
-import 'package:path_provider/path_provider.dart';
+
 import 'package:data_table_2/data_table_2.dart';
 import 'package:open_file/open_file.dart';
 import 'package:file_picker/file_picker.dart';
-
+import 'package:path_provider/path_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_web_dashboard/constants/style.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_web_dashboard/widgets/custom_text.dart';
+import 'dart:html' as html;
 
 class Clientstable extends StatefulWidget {
   const Clientstable({super.key});
@@ -83,20 +84,23 @@ class _ClientstableState extends State<Clientstable> {
       final response = await http.get(Uri.parse(apiUrl));
 
       if (response.statusCode == 200) {
-        // Get system temporary directory
-        final Directory appDocDir = await getApplicationDocumentsDirectory();
-        final String predefinedPath = '${appDocDir.path}/user_data.pdf';
+        // Create a Blob and trigger a download using the web
+        final blob = html.Blob([response.bodyBytes]);
+        final url = html.Url.createObjectUrlFromBlob(blob);
 
-        // Save PDF to predefined directory
-        final file = File(predefinedPath);
-        await file.writeAsBytes(response.bodyBytes);
+        // Create an anchor element and trigger a download
+        final anchor = html.AnchorElement(href: url)
+          ..download = "user_data.pdf"
+          ..click();
 
-        // Notify the user and open the file if required
+        // Clean up the object URL
+        html.Url.revokeObjectUrl(url);
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('PDF saved to $predefinedPath')),
+          const SnackBar(content: Text('Download started successfully!')),
         );
 
-        print("PDF saved at $predefinedPath");
+        print("Download triggered successfully.");
       } else {
         throw Exception(
             "Failed to download PDF. Status Code: ${response.statusCode}");
