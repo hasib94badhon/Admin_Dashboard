@@ -12,5 +12,6 @@ urlpatterns = [
     path('upload-users/', upload_excel, name='upload-users'),
     path('toggle-status/<int:pk>/', toggle_status, name='toggle_status'),
     path('get-users/', get_users, name='get_users'),
+    path('download-user/', download_user, name='download_user'),
     
 ]

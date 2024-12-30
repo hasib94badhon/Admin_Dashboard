@@ -1,4 +1,5 @@
 import os
+from MySQLdb import Time
 from django.views import View
 from rest_framework.views import APIView
 from rest_framework.generics import ListCreateAPIView
@@ -6,6 +7,7 @@ from rest_framework.response import Response
 from .models import *  
 from .serializers import *
 import pandas as pd
+import time
 
 from django.http import JsonResponse,HttpResponse
 from django.template.loader import render_to_string
@@ -223,29 +225,6 @@ def get_users(request):
 
         users = Users.objects.all()
 
-        # Search by user_id: Fetch specific user data
-        # if search:
-        #     try:
-        #         user = users.get(user_id=search)
-        #         user_data = {
-        #             'user_id': user.user_id,
-        #             'name': user.name,
-        #             'phone': user.phone,
-        #             'description': user.description,
-        #             'location': user.location,
-        #             'photo': user.photo,
-        #             'user_type': user.user_type,
-        #             'status': user.status,
-        #             'user_shared': user.user_shared,
-        #             'user_viewed': user.user_viewed,
-        #             'user_called': user.user_called,
-        #             'user_total_post': user.user_total_post,
-        #             'user_logged_date': user.user_logged_date,
-        #             'cat_id': user.cat_id
-        #         }
-        #         return JsonResponse({'user': user_data}, status=200, safe=False)
-        #     except Users.DoesNotExist:
-        #         return JsonResponse({'error': 'User not found'}, status=404)
 
         if search:
             users = users.filter(user_id=search)
@@ -274,11 +253,36 @@ def get_users(request):
 
         if download:  # Generate a PDF if the 'download' parameter is set
             # Render data in HTML template for PDF
+            if user_id:
+                if user_id:  # Fetch specific user based on user_id
+                    try:
+                        user = Users.objects.get(user_id=user_id)  # Fetch a specific user
+                    except Users.DoesNotExist:
+                        return JsonResponse({'error': 'User not found'}, status=404)
+                    
+                    # Convert user to a dictionary to pass into the template
+                    user_data = {
+                        'user_id': user.user_id,
+                        'name': user.name,
+                        'phone': user.phone,
+                        'user_type': user.user_type,
+                        'status': user.status,
+                        'location': user.location,
+                        'user_total_post': user.user_total_post,
+                        'user_logged_date': user.user_logged_date,
+                    }
+                # Only one user if filtering by user_id
+                data = user_data
+                user_name = data['name'].replace(" ", "_")  # To safely use in the filename
+                filename = f"{user_name}.pdf"  # Dynamic filename based on user name
+            else:
+                filename = "user_data.pdf"
+            
             template_path = os.path.join(os.getcwd(), "templates", "user_template.html")
             if not os.path.exists(template_path):
                 raise FileNotFoundError("HTML template not found at {}".format(template_path))
 
-            html_content = render_to_string('user_template.html', {'users': user_data})
+            html_content = render_to_string('user_template.html', {'users': data})
             
             # Create a temporary PDF file
             pdf_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
@@ -292,13 +296,10 @@ def get_users(request):
             pdf_file.close()
 
             # Return the file as a downloadable attachment
-            return HttpResponse(pdf_content, content_type='application/pdf', headers={
-                                    'Content-Disposition': 'attachment; filename="user_data.pdf"',
-                                })
-            # response = HttpResponse(pdf_content, content_type='application/pdf')
-            # response['Content-Disposition'] = 'attachment; filename="user_data.pdf"'
-            # return response
-
+            # Return the PDF file as response for download with specific filename
+            response = HttpResponse(pdf_content, content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
        
 
         # Sort by criteria
@@ -321,5 +322,66 @@ def get_users(request):
         ))
 
         return JsonResponse({'users': user_data}, status=200, safe=False)
+
+    return JsonResponse({'error': 'Invalid request method'}, status=405)
+
+
+
+
+def download_user(request):
+    """
+    API to fetch and download a specific user's data as a PDF.
+    Query parameter:
+        - user_id: The ID of the user whose data needs to be downloaded.
+    """
+    if request.method == 'GET':
+        seconds = time.time()
+        now = time.ctime(seconds)
+        user_id = request.GET.get('user_id', None)
+
+        if not user_id:
+            return JsonResponse({'error': 'User ID is required'}, status=400)
+
+        try:
+            user = Users.objects.get(user_id=user_id)
+        except Users.DoesNotExist:
+            return JsonResponse({'error': 'User not found'}, status=404)
+
+        user_data = {
+            'user_id': user.user_id,
+            'name': user.name,
+            'phone': user.phone,
+            'user_type': user.user_type,
+            'status': user.status,
+            'location': user.location,
+            'user_total_post': user.user_total_post,
+            'user_logged_date': user.user_logged_date,
+            'now': now,  # Include generated time
+        }
+
+        try:
+            template_path = os.path.join(os.getcwd(), "templates", "user_template.html")
+            if not os.path.exists(template_path):
+                raise FileNotFoundError("HTML template not found at {}".format(template_path))
+
+            html_content = render_to_string('user_template.html', {'user': user_data})
+
+            pdf_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+            HTML(string=html_content).write_pdf(pdf_file.name)
+
+            with open(pdf_file.name, 'rb') as f:
+                pdf_content = f.read()
+
+            pdf_file.close()
+
+            user_name = user.name.replace(" ", "_")
+            pdf_filename = f"{user_name}.pdf"
+
+            response = HttpResponse(pdf_content, content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="{pdf_filename}"'
+            return response
+
+        except Exception as e:
+            return JsonResponse({'error': f'Error generating PDF: {str(e)}'}, status=500)
 
     return JsonResponse({'error': 'Invalid request method'}, status=405)

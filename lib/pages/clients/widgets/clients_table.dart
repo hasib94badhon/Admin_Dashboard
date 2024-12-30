@@ -75,25 +75,26 @@ class _ClientstableState extends State<Clientstable> {
     }
   }
 
-  Future<void> downloadUserData(BuildContext context) async {
+  Future<void> downloadUserData(BuildContext context, String? userId) async {
     try {
-      // Define the API URL
-      String apiUrl = 'http://127.0.0.1:1200/get-users/?download=true';
-
-      // Make an HTTP GET request
+      String apiUrl = 'http://127.0.0.1:1200/download-user/?user_id=$userId';
       final response = await http.get(Uri.parse(apiUrl));
 
       if (response.statusCode == 200) {
-        // Create a Blob and trigger a download using the web
+        final contentDisposition = response.headers['Content-Disposition'];
+        final fileName = contentDisposition != null
+            ? RegExp(r'filename="(.+)"')
+                .firstMatch(contentDisposition)
+                ?.group(1)
+            : 'user_data.pdf';
+
         final blob = html.Blob([response.bodyBytes]);
         final url = html.Url.createObjectUrlFromBlob(blob);
 
-        // Create an anchor element and trigger a download
         final anchor = html.AnchorElement(href: url)
-          ..download = "user_data.pdf"
+          ..download = fileName
           ..click();
 
-        // Clean up the object URL
         html.Url.revokeObjectUrl(url);
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -172,7 +173,8 @@ class _ClientstableState extends State<Clientstable> {
                 const SizedBox(width: 12),
                 ElevatedButton.icon(
                   onPressed: () {
-                    downloadUserData(context); // Pass the context explicitly
+                    downloadUserData(
+                        context, searchUserId); // Pass the context explicitly
                   },
                   icon: const Icon(Icons.download, color: Colors.white),
                   label: const Text("Download"),
