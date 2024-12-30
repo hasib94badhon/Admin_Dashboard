@@ -11,6 +11,8 @@ urlpatterns = [
     path('insert-cat/', insert_cat, name='insert_cat'),
     path('upload-users/', upload_excel, name='upload-users'),
     path('toggle-status/<int:pk>/', toggle_status, name='toggle_status'),
+    path('user-toggle-status/<int:pk>/', user_toggle_status, name='user_toggle_status'),
+    path('user-type-toggle-status/<int:pk>/', user_type_toggle_status, name='user_type_toggle_status'),
     path('get-users/', get_users, name='get_users'),
     path('download-user/', download_user, name='download_user'),
     

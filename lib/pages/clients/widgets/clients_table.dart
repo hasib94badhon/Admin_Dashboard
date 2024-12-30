@@ -114,6 +114,39 @@ class _ClientstableState extends State<Clientstable> {
     }
   }
 
+  Future<void> usertoggleStatus(int userId) async {
+    final url = Uri.parse('http://127.0.0.1:1200/user-toggle-status/$userId/');
+
+    try {
+      final response = await http.post(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        print('User Status updated: ${data['status']}');
+      } else {
+        print('Failed to toggle user status: ${response.body}');
+      }
+    } catch (e) {
+      print('Error: $e');
+    }
+  }
+
+  Future<void> usertypetoggleStatus(int userId) async {
+    final url =
+        Uri.parse('http://127.0.0.1:1200/user-type-toggle-status/$userId/');
+
+    try {
+      final response = await http.post(url);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        print('User Status updated: ${data['user_type']}');
+      } else {
+        print('Failed to toggle user status: ${response.body}');
+      }
+    } catch (e) {
+      print('Error: $e');
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -216,8 +249,8 @@ class _ClientstableState extends State<Clientstable> {
                           value: 'recent', child: Text("Most recent")),
                       DropdownMenuItem(
                           value: 'Category', child: Text("Users by category")),
-                      DropdownMenuItem(
-                          value: 'User Type', child: Text("Paid/Free")),
+                      DropdownMenuItem(value: 'User Type', child: Text("PAID")),
+                      DropdownMenuItem(value: 'User Type', child: Text("FREE")),
                       DropdownMenuItem(
                           value: 'User_Called',
                           child: Text("Users by most called")),
@@ -236,223 +269,219 @@ class _ClientstableState extends State<Clientstable> {
           const SizedBox(height: 16),
 
           // User Data Table
-          isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : userData.isEmpty
-                  ? const Center(child: Text("No data available"))
-                  : Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        border: Border.all(
-                            color: active.withOpacity(.4), width: .5),
-                        boxShadow: [
-                          BoxShadow(
-                            offset: const Offset(0, 6),
-                            color: lightGrey.withOpacity(.1),
-                            blurRadius: 12,
-                          )
-                        ],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      padding: const EdgeInsets.all(16),
-                      margin: const EdgeInsets.only(bottom: 30),
-                      child: SizedBox(
-                        height: (60 * 7) + 40,
-                        child: DataTable2(
-                          columnSpacing: 12,
-                          dataRowHeight: 60,
-                          headingRowHeight: 40,
-                          horizontalMargin: 12,
-                          minWidth: 700,
-                          columns: const [
-                            DataColumn2(
-                              label: Text("UserID"),
-                              size: ColumnSize.L,
-                            ),
-                            DataColumn(
-                              label: Text('Category'),
-                            ),
-                            DataColumn(
-                              label: Text('User called'),
-                            ),
-                            DataColumn(
-                              label: Text('User Type'),
-                            ),
-                            DataColumn(
-                              label: Text('Status'),
-                            ),
+          Container(
+            padding: EdgeInsets.all(5),
+            color: Colors.pink,
+            child: isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : userData.isEmpty
+                    ? const Center(child: Text("No data available"))
+                    : Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          border: Border.all(
+                              color: active.withOpacity(.4), width: .5),
+                          boxShadow: [
+                            BoxShadow(
+                              offset: const Offset(0, 6),
+                              color: lightGrey.withOpacity(.1),
+                              blurRadius: 12,
+                            )
                           ],
-                          rows: List<DataRow>.generate(
-                            userData.length,
-                            (index) => DataRow(
-                              cells: [
-                                DataCell(CustomText(
-                                    text:
-                                        userData[index]['user_id'].toString())),
-                                DataCell(CustomText(
-                                    text:
-                                        userData[index]['cat_id'].toString())),
-                                DataCell(Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(
-                                      Icons.star,
-                                      color: Colors.deepOrange,
-                                      size: 18,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        padding: const EdgeInsets.all(16),
+                        margin: const EdgeInsets.only(bottom: 30),
+                        child: SizedBox(
+                          height: (60 * 7) + 40,
+                          child: DataTable2(
+                            columnSpacing: 12,
+                            dataRowHeight: 60,
+                            headingRowHeight: 30,
+                            horizontalMargin: 12,
+                            minWidth: 700,
+                            columns: const [
+                              DataColumn2(
+                                label: Text("UserID"),
+                                size: ColumnSize.L,
+                              ),
+                              DataColumn(
+                                label: Text('Category'),
+                              ),
+                              DataColumn(
+                                label: Text('User called'),
+                              ),
+                              DataColumn(
+                                label: Text('User Type'),
+                              ),
+                              DataColumn(
+                                label: Text('Status'),
+                              ),
+                            ],
+                            rows: List<DataRow>.generate(
+                              userData.length,
+                              (index) => DataRow(
+                                cells: [
+                                  DataCell(CustomText(
+                                      text: userData[index]['user_id']
+                                          .toString())),
+                                  DataCell(CustomText(
+                                      text: userData[index]['cat_id']
+                                          .toString())),
+                                  DataCell(Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.star,
+                                        color: Colors.deepOrange,
+                                        size: 18,
+                                      ),
+                                      SizedBox(
+                                        width: 5,
+                                      ),
+                                      CustomText(
+                                        text: userData[index]['user_called']
+                                            .toString(),
+                                      )
+                                    ],
+                                  )),
+                                  // DataCell(Container(
+                                  //   decoration: BoxDecoration(
+                                  //     color: light,
+                                  //     borderRadius: BorderRadius.circular(20),
+                                  //     border:
+                                  //         Border.all(color: active, width: .5),
+                                  //   ),
+                                  //   padding: const EdgeInsets.symmetric(
+                                  //       horizontal: 12, vertical: 6),
+                                  //   child: CustomText(
+                                  //     text: userData[index]
+                                  //         ['user_type'], // Toggle paid status
+                                  //     color: active.withOpacity(.7),
+                                  //     weight: FontWeight.bold,
+                                  //   ),
+                                  // )),
+
+                                  DataCell(
+                                    GestureDetector(
+                                      onTap: () async {
+                                        int user_id = userData[index][
+                                            'user_id']; // Assuming 'id' is present in your data
+                                        await usertypetoggleStatus(
+                                            user_id); // Call the API
+                                        // Reload or refresh the UI after the API call
+                                        setState(() {
+                                          userData[index]
+                                              ['user_type'] = !userData[
+                                                  index][
+                                              'user_type']; // Toggle status locally
+                                        });
+                                      },
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: userData[index]['user_type'] ==
+                                                  true
+                                              ? Colors.green.withOpacity(0.2)
+                                              : Colors.red.withOpacity(0.2),
+                                          borderRadius:
+                                              BorderRadius.circular(20),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12, vertical: 6),
+                                        child: Text(
+                                          userData[index]['user_type'] == true
+                                              ? 'PAID'
+                                              : 'FREE',
+                                          style: TextStyle(
+                                            color: userData[index]
+                                                        ['user_type'] ==
+                                                    true
+                                                ? const Color.fromARGB(
+                                                    255, 89, 116, 238)
+                                                : const Color.fromARGB(
+                                                    255, 147, 154, 247),
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
                                     ),
-                                    SizedBox(
-                                      width: 5,
+                                  ),
+                                  // DataCell(
+                                  //   StatefulBuilder(
+                                  //     builder: (context, setState) {
+                                  //       // Variable to track the toggle state
+                                  //       bool isActive =
+                                  //           true; // Active state toggles between "Active" and "Pause"
+
+                                  //       return Switch(
+                                  //         value: isActive,
+                                  //         onChanged: (value) {
+                                  //           setState(() {
+                                  //             isActive = value;
+                                  //           });
+
+                                  //           // Add your backend logic here for toggling Active/Pause
+                                  //           print(isActive
+                                  //               ? "Switched to Active"
+                                  //               : "Switched to Pause");
+                                  //         },
+                                  //         activeColor: Colors
+                                  //             .green, // Color for Active state
+                                  //         inactiveThumbColor: Colors
+                                  //             .red, // Color for Pause state
+                                  //         activeTrackColor: Colors.greenAccent,
+                                  //         inactiveTrackColor: Colors.redAccent,
+                                  //       );
+                                  //     },
+                                  //   ),
+                                  // )
+                                  DataCell(
+                                    GestureDetector(
+                                      onTap: () async {
+                                        int categoryId = userData[index][
+                                            'user_id']; // Assuming 'id' is present in your data
+                                        await usertoggleStatus(
+                                            categoryId); // Call the API
+                                        // Reload or refresh the UI after the API call
+                                        setState(() {
+                                          userData[index]['status'] = !userData[
+                                                  index][
+                                              'status']; // Toggle status locally
+                                        });
+                                      },
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          color: userData[index]['status'] ==
+                                                  true
+                                              ? Colors.green.withOpacity(0.2)
+                                              : Colors.red.withOpacity(0.2),
+                                          borderRadius:
+                                              BorderRadius.circular(20),
+                                        ),
+                                        padding: const EdgeInsets.symmetric(
+                                            horizontal: 12, vertical: 6),
+                                        child: Text(
+                                          userData[index]['status'] == true
+                                              ? 'Active'
+                                              : 'Inactive',
+                                          style: TextStyle(
+                                            color: userData[index]['status'] ==
+                                                    true
+                                                ? Colors.green
+                                                : Colors.red,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
                                     ),
-                                    CustomText(
-                                      text: userData[index]['user_called']
-                                          .toString(),
-                                    )
-                                  ],
-                                )),
-                                DataCell(Container(
-                                  decoration: BoxDecoration(
-                                    color: light,
-                                    borderRadius: BorderRadius.circular(20),
-                                    border:
-                                        Border.all(color: active, width: .5),
                                   ),
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 12, vertical: 6),
-                                  child: CustomText(
-                                    text: userData[index]
-                                        ['user_type'], // Toggle paid status
-                                    color: active.withOpacity(.7),
-                                    weight: FontWeight.bold,
-                                  ),
-                                )),
-                                DataCell(
-                                  StatefulBuilder(
-                                    builder: (context, setState) {
-                                      // Variables to control button states
-                                      bool isPlayActive =
-                                          true; // Initial active button (Play or Pause)
-                                      bool isDeleteLocked =
-                                          true; // Initial state for Delete button safety lock
-
-                                      return Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          // Play Button
-                                          ElevatedButton.icon(
-                                            onPressed: isPlayActive
-                                                ? null
-                                                : () {
-                                                    setState(() {
-                                                      isPlayActive = true;
-                                                    });
-                                                    print(
-                                                        "Play action triggered");
-                                                  },
-                                            icon: const Icon(Icons.play_arrow),
-                                            label: const Text("Play"),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: Colors.green,
-                                              foregroundColor: Colors.white,
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                              ),
-                                            ).copyWith(
-                                              backgroundColor:
-                                                  MaterialStateProperty
-                                                      .resolveWith<Color>(
-                                                (states) => isPlayActive
-                                                    ? Colors.green
-                                                    : Colors.green
-                                                        .withOpacity(0.5),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 10),
-
-                                          // Pause Button
-                                          ElevatedButton.icon(
-                                            onPressed: isPlayActive
-                                                ? () {
-                                                    setState(() {
-                                                      isPlayActive = false;
-                                                    });
-                                                    print(
-                                                        "Pause action triggered");
-                                                  }
-                                                : null,
-                                            icon: const Icon(Icons.pause),
-                                            label: const Text("Pause"),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: Colors.blue,
-                                              foregroundColor: Colors.white,
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                              ),
-                                            ).copyWith(
-                                              backgroundColor:
-                                                  MaterialStateProperty
-                                                      .resolveWith<Color>(
-                                                (states) => !isPlayActive
-                                                    ? Colors.blue
-                                                    : Colors.blue
-                                                        .withOpacity(0.5),
-                                              ),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 10),
-
-                                          // Delete Button
-                                          ElevatedButton.icon(
-                                            onPressed: isDeleteLocked
-                                                ? () {
-                                                    setState(() {
-                                                      isDeleteLocked = false;
-                                                    });
-                                                    ScaffoldMessenger.of(
-                                                            context)
-                                                        .showSnackBar(
-                                                      const SnackBar(
-                                                        content: Text(
-                                                            "Safety lock removed. Tap Delete to proceed."),
-                                                      ),
-                                                    );
-                                                  }
-                                                : () {
-                                                    print(
-                                                        "Delete action triggered");
-                                                  },
-                                            icon: Icon(
-                                              isDeleteLocked
-                                                  ? Icons.lock
-                                                  : Icons.delete_forever,
-                                            ),
-                                            label: Text(isDeleteLocked
-                                                ? "Unlock"
-                                                : "Delete"),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: isDeleteLocked
-                                                  ? Colors.grey
-                                                  : Colors.red,
-                                              foregroundColor: Colors.white,
-                                              shape: RoundedRectangleBorder(
-                                                borderRadius:
-                                                    BorderRadius.circular(12),
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      );
-                                    },
-                                  ),
-                                )
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
+          ),
 
           // Download User Data Section
           // Container(

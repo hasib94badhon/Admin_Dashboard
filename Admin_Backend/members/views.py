@@ -204,6 +204,41 @@ def toggle_status(request, pk):
     return JsonResponse({"error": "Invalid request method."}, status=400)
 
 
+@csrf_exempt
+def user_toggle_status(request, pk):
+    
+    if request.method == "POST":
+        user = get_object_or_404(Users, pk=pk)
+        # Toggle status (1 becomes 0 and 0 becomes 1)
+        user.status = not user.status
+        user.save()
+
+        return JsonResponse({
+            "success": True,
+            "message": "User status updated successfully.",
+            "id": user.user_id,
+            "name": user.name,
+            "status": user.status
+        }, status=200)
+    return JsonResponse({"error": "Invalid request method."}, status=400)
+
+@csrf_exempt
+def user_type_toggle_status(request, pk):
+   
+    if request.method == "POST":
+        user = get_object_or_404(Users, pk=pk)
+        # Toggle status (1 becomes 0 and 0 becomes 1)
+        user.user_type = not user.user_type
+        user.save()
+        return JsonResponse({
+            "success": True,
+            "message": "User type updated successfully.",
+            "id": user.user_id,
+            "name": user.name,
+            "status": user.user_type
+        }, status=200)
+    return JsonResponse({"error": "Invalid request method."}, status=400)
+
 
 
 def get_users(request):
@@ -251,55 +286,55 @@ def get_users(request):
             'user_total_post', 'user_logged_date', 'cat_id'
         ))
 
-        if download:  # Generate a PDF if the 'download' parameter is set
-            # Render data in HTML template for PDF
-            if user_id:
-                if user_id:  # Fetch specific user based on user_id
-                    try:
-                        user = Users.objects.get(user_id=user_id)  # Fetch a specific user
-                    except Users.DoesNotExist:
-                        return JsonResponse({'error': 'User not found'}, status=404)
+        # if download:  # Generate a PDF if the 'download' parameter is set
+        #     # Render data in HTML template for PDF
+        #     if user_id:
+        #         if user_id:  # Fetch specific user based on user_id
+        #             try:
+        #                 user = Users.objects.get(user_id=user_id)  # Fetch a specific user
+        #             except Users.DoesNotExist:
+        #                 return JsonResponse({'error': 'User not found'}, status=404)
                     
-                    # Convert user to a dictionary to pass into the template
-                    user_data = {
-                        'user_id': user.user_id,
-                        'name': user.name,
-                        'phone': user.phone,
-                        'user_type': user.user_type,
-                        'status': user.status,
-                        'location': user.location,
-                        'user_total_post': user.user_total_post,
-                        'user_logged_date': user.user_logged_date,
-                    }
-                # Only one user if filtering by user_id
-                data = user_data
-                user_name = data['name'].replace(" ", "_")  # To safely use in the filename
-                filename = f"{user_name}.pdf"  # Dynamic filename based on user name
-            else:
-                filename = "user_data.pdf"
+        #             # Convert user to a dictionary to pass into the template
+        #             user_data = {
+        #                 'user_id': user.user_id,
+        #                 'name': user.name,
+        #                 'phone': user.phone,
+        #                 'user_type': user.user_type,
+        #                 'status': user.status,
+        #                 'location': user.location,
+        #                 'user_total_post': user.user_total_post,
+        #                 'user_logged_date': user.user_logged_date,
+        #             }
+        #         # Only one user if filtering by user_id
+        #         data = user_data
+        #         user_name = data['name'].replace(" ", "_")  # To safely use in the filename
+        #         filename = f"{user_name}.pdf"  # Dynamic filename based on user name
+        #     else:
+        #         filename = "user_data.pdf"
             
-            template_path = os.path.join(os.getcwd(), "templates", "user_template.html")
-            if not os.path.exists(template_path):
-                raise FileNotFoundError("HTML template not found at {}".format(template_path))
+        #     template_path = os.path.join(os.getcwd(), "templates", "user_template.html")
+        #     if not os.path.exists(template_path):
+        #         raise FileNotFoundError("HTML template not found at {}".format(template_path))
 
-            html_content = render_to_string('user_template.html', {'users': data})
+        #     html_content = render_to_string('user_template.html', {'users': data})
             
-            # Create a temporary PDF file
-            pdf_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-            HTML(string=html_content).write_pdf(pdf_file.name)
+        #     # Create a temporary PDF file
+        #     pdf_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+        #     HTML(string=html_content).write_pdf(pdf_file.name)
 
-            # Read the temporary file content and return it as a response
-            with open(pdf_file.name, 'rb') as f:
-                pdf_content = f.read()
+        #     # Read the temporary file content and return it as a response
+        #     with open(pdf_file.name, 'rb') as f:
+        #         pdf_content = f.read()
 
-            # Delete the temporary file after use
-            pdf_file.close()
+        #     # Delete the temporary file after use
+        #     pdf_file.close()
 
-            # Return the file as a downloadable attachment
-            # Return the PDF file as response for download with specific filename
-            response = HttpResponse(pdf_content, content_type='application/pdf')
-            response['Content-Disposition'] = f'attachment; filename="{filename}"'
-            return response
+        #     # Return the file as a downloadable attachment
+        #     # Return the PDF file as response for download with specific filename
+        #     response = HttpResponse(pdf_content, content_type='application/pdf')
+        #     response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        #     return response
        
 
         # Sort by criteria
