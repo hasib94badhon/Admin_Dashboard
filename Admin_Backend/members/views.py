@@ -342,8 +342,10 @@ def get_users(request):
             users = users.order_by('-user_logged_date')  # Most recent
         elif sort_by == 'category':
             users = users.order_by('cat_id')  # Sorted by category ID
-        elif sort_by == 'user_type':
-            users = users.order_by('user_type')  # Sorted by user type
+        elif sort_by == 'paid':
+            users = users.filter(user_type=True)
+        elif sort_by == 'free':
+            users = users.filter(user_type=False)  # Sorted by user type
         elif sort_by == 'user_called':
             users = users.order_by('-user_called')  # Highest to lowest calls
         else:

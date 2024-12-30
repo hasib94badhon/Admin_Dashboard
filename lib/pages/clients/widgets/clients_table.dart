@@ -44,20 +44,33 @@ class _ClientstableState extends State<Clientstable> {
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
 
-        // Handle specific user vs multiple users
-        if (userId != null &&
-            userId.isNotEmpty &&
-            responseData.containsKey('user')) {
-          setState(() {
-            userData = [responseData['user']]; // Single user data as a list
-          });
-        } else if (responseData.containsKey('users')) {
-          setState(() {
-            userData = responseData['users']; // Full list of users
-          });
+        // Handle sorting logic for PAID and FREE
+        if (responseData.containsKey('users')) {
+          List users = responseData['users'];
+
+          // Check selectedSort for PAID or FREE
+          if (selectedSort.toLowerCase() == 'paid') {
+            setState(() {
+              userData = users
+                  .where(
+                      (user) => user['user_type'] == true) // Filter PAID users
+                  .toList();
+            });
+          } else if (selectedSort.toLowerCase() == 'free') {
+            setState(() {
+              userData = users
+                  .where(
+                      (user) => user['user_type'] == false) // Filter FREE users
+                  .toList();
+            });
+          } else {
+            setState(() {
+              userData = users; // Load all users
+            });
+          }
         } else {
           setState(() {
-            userData = []; // No data found
+            userData = []; // No users found
           });
         }
       } else {
@@ -73,6 +86,50 @@ class _ClientstableState extends State<Clientstable> {
         isLoading = false;
       });
     }
+
+    // try {
+    //   // Base API URL
+    //   String apiUrl = 'http://127.0.0.1:1200/get-users/';
+    //   if (userId != null && userId.isNotEmpty) {
+    //     apiUrl += '?search=$userId';
+    //   } else {
+    //     apiUrl += '?sort=${selectedSort.toLowerCase()}';
+    //   }
+
+    //   // Fetch data from API
+    //   final response = await http.get(Uri.parse(apiUrl));
+    //   if (response.statusCode == 200) {
+    //     final responseData = json.decode(response.body);
+
+    //     // Handle specific user vs multiple users
+    //     if (userId != null &&
+    //         userId.isNotEmpty &&
+    //         responseData.containsKey('user')) {
+    //       setState(() {
+    //         userData = [responseData['user']]; // Single user data as a list
+    //       });
+    //     } else if (responseData.containsKey('users')) {
+    //       setState(() {
+    //         userData = responseData['users']; // Full list of users
+    //       });
+    //     } else {
+    //       setState(() {
+    //         userData = []; // No data found
+    //       });
+    //     }
+    //   } else {
+    //     throw Exception("Failed to load data");
+    //   }
+    // } catch (e) {
+    //   print("Error: $e");
+    //   setState(() {
+    //     userData = [];
+    //   });
+    // } finally {
+    //   setState(() {
+    //     isLoading = false;
+    //   });
+    // }
   }
 
   Future<void> downloadUserData(BuildContext context, String? userId) async {
@@ -249,15 +306,16 @@ class _ClientstableState extends State<Clientstable> {
                           value: 'recent', child: Text("Most recent")),
                       DropdownMenuItem(
                           value: 'Category', child: Text("Users by category")),
-                      DropdownMenuItem(value: 'User Type', child: Text("PAID")),
-                      DropdownMenuItem(value: 'User Type', child: Text("FREE")),
+                      DropdownMenuItem(value: 'paid', child: Text("PAID")),
+                      DropdownMenuItem(value: 'free', child: Text("FREE")),
                       DropdownMenuItem(
                           value: 'User_Called',
                           child: Text("Users by most called")),
                     ],
-                    onChanged: (value) {
+                    onChanged: (newValue) {
                       setState(() {
-                        selectedSort = value!;
+                        selectedSort = newValue!;
+                        isLoading = true;
                       });
                       fetchData(); // Fetch sorted data
                     },
