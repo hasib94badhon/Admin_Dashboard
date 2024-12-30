@@ -1,4 +1,9 @@
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 import 'package:data_table_2/data_table_2.dart';
+import 'package:open_file/open_file.dart';
+import 'package:file_picker/file_picker.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_web_dashboard/constants/style.dart';
 import 'package:http/http.dart' as http;
@@ -69,6 +74,41 @@ class _ClientstableState extends State<Clientstable> {
     }
   }
 
+  Future<void> downloadUserData(BuildContext context) async {
+    try {
+      // Define the API URL
+      String apiUrl = 'http://127.0.0.1:1200/get-users/?download=true';
+
+      // Make an HTTP GET request
+      final response = await http.get(Uri.parse(apiUrl));
+
+      if (response.statusCode == 200) {
+        // Get system temporary directory
+        final Directory appDocDir = await getApplicationDocumentsDirectory();
+        final String predefinedPath = '${appDocDir.path}/user_data.pdf';
+
+        // Save PDF to predefined directory
+        final file = File(predefinedPath);
+        await file.writeAsBytes(response.bodyBytes);
+
+        // Notify the user and open the file if required
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('PDF saved to $predefinedPath')),
+        );
+
+        print("PDF saved at $predefinedPath");
+      } else {
+        throw Exception(
+            "Failed to download PDF. Status Code: ${response.statusCode}");
+      }
+    } catch (e) {
+      print("Error downloading or saving PDF: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error downloading or saving PDF: $e")),
+      );
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -119,6 +159,23 @@ class _ClientstableState extends State<Clientstable> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 20, vertical: 15),
                     backgroundColor: active,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    elevation: 3,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    downloadUserData(context); // Pass the context explicitly
+                  },
+                  icon: const Icon(Icons.download, color: Colors.white),
+                  label: const Text("Download"),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 15),
+                    backgroundColor: const Color.fromARGB(255, 25, 192, 81),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -392,75 +449,75 @@ class _ClientstableState extends State<Clientstable> {
                     ),
 
           // Download User Data Section
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: active.withOpacity(.4), width: .5),
-              boxShadow: [
-                BoxShadow(
-                  offset: const Offset(0, 6),
-                  color: lightGrey.withOpacity(.1),
-                  blurRadius: 12,
-                )
-              ],
-            ),
-            padding: const EdgeInsets.all(16),
-            margin: const EdgeInsets.only(bottom: 30),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const CustomText(
-                  text: "Download User Data",
-                  size: 18,
-                  weight: FontWeight.bold,
-                  color: Colors.black87,
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        decoration: InputDecoration(
-                          hintText: "Enter UserID",
-                          filled: true,
-                          fillColor: light,
-                          prefixIcon:
-                              const Icon(Icons.search, color: Colors.grey),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        // Handle download functionality here
-                      },
-                      icon: const Icon(Icons.download, color: Colors.white),
-                      label: const Text("Download"),
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 24, vertical: 16),
-                        backgroundColor: active,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        elevation: 3,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  "Enter a UserID to download all related data.",
-                  style: TextStyle(color: Colors.grey),
-                ),
-              ],
-            ),
-          ),
+          // Container(
+          //   decoration: BoxDecoration(
+          //     color: Colors.white,
+          //     borderRadius: BorderRadius.circular(8),
+          //     border: Border.all(color: active.withOpacity(.4), width: .5),
+          //     boxShadow: [
+          //       BoxShadow(
+          //         offset: const Offset(0, 6),
+          //         color: lightGrey.withOpacity(.1),
+          //         blurRadius: 12,
+          //       )
+          //     ],
+          //   ),
+          //   padding: const EdgeInsets.all(16),
+          //   margin: const EdgeInsets.only(bottom: 30),
+          //   child: Column(
+          //     crossAxisAlignment: CrossAxisAlignment.start,
+          //     children: [
+          //       const CustomText(
+          //         text: "Download User Data",
+          //         size: 18,
+          //         weight: FontWeight.bold,
+          //         color: Colors.black87,
+          //       ),
+          //       const SizedBox(height: 16),
+          //       Row(
+          //         children: [
+          //           Expanded(
+          //             child: TextField(
+          //               decoration: InputDecoration(
+          //                 hintText: "Enter UserID",
+          //                 filled: true,
+          //                 fillColor: light,
+          //                 prefixIcon:
+          //                     const Icon(Icons.search, color: Colors.grey),
+          //                 border: OutlineInputBorder(
+          //                   borderRadius: BorderRadius.circular(8),
+          //                   borderSide: BorderSide.none,
+          //                 ),
+          //               ),
+          //             ),
+          //           ),
+          //           const SizedBox(width: 16),
+          //           ElevatedButton.icon(
+          //             onPressed: () {
+          //               // Handle download functionality here
+          //             },
+          //             icon: const Icon(Icons.download, color: Colors.white),
+          //             label: const Text("Download"),
+          //             style: ElevatedButton.styleFrom(
+          //               padding: const EdgeInsets.symmetric(
+          //                   horizontal: 24, vertical: 16),
+          //               backgroundColor: active,
+          //               shape: RoundedRectangleBorder(
+          //                 borderRadius: BorderRadius.circular(8),
+          //               ),
+          //               elevation: 3,
+          //             ),
+          //           ),
+          //         ],
+          //       ),
+          //       const SizedBox(height: 8),
+          //       const Text(
+          //         "Enter a UserID to download all related data.",
+          //         style: TextStyle(color: Colors.grey),
+          //       ),
+          //     ],
+          //   ),
+          // ),
         ],
       ),
     );

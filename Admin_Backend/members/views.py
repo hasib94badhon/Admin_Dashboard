@@ -1,3 +1,4 @@
+import os
 from django.views import View
 from rest_framework.views import APIView
 from rest_framework.generics import ListCreateAPIView
@@ -6,13 +7,16 @@ from .models import *
 from .serializers import *
 import pandas as pd
 
-from django.http import JsonResponse
+from django.http import JsonResponse,HttpResponse
+from django.template.loader import render_to_string
 from django.views.decorators.csrf import csrf_exempt
 from ftplib import FTP
 from django.core.files.storage import FileSystemStorage
 from openpyxl import load_workbook
 from datetime import datetime
 from django.shortcuts import get_object_or_404
+from weasyprint import HTML
+import tempfile
 
 
 # def data_view(request):
@@ -214,6 +218,8 @@ def get_users(request):
         category = request.GET.get('category', None)
         user_type = request.GET.get('user_type', None)
         search = request.GET.get('search', None)  # Search by user_id
+        user_id = request.GET.get('search', None)
+        download = request.GET.get('download', None) 
 
         users = Users.objects.all()
 
@@ -251,6 +257,49 @@ def get_users(request):
         # Filter by user_type
         if user_type:
             users = users.filter(user_type=user_type)
+        
+         #Query users
+        if user_id:  # Fetch a specific user
+            users = Users.objects.filter(user_id=user_id)
+            if not users.exists():
+                return JsonResponse({'error': 'User not found'}, status=404)
+        else:  # Fetch all users
+            users = Users.objects.all()
+        
+        user_data = list(users.values(
+            'user_id', 'name', 'phone', 'description', 'location', 'photo',
+            'user_type', 'status', 'user_shared', 'user_viewed', 'user_called',
+            'user_total_post', 'user_logged_date', 'cat_id'
+        ))
+
+        if download:  # Generate a PDF if the 'download' parameter is set
+            # Render data in HTML template for PDF
+            template_path = os.path.join(os.getcwd(), "templates", "user_template.html")
+            if not os.path.exists(template_path):
+                raise FileNotFoundError("HTML template not found at {}".format(template_path))
+
+            html_content = render_to_string('user_template.html', {'users': user_data})
+            
+            # Create a temporary PDF file
+            pdf_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
+            HTML(string=html_content).write_pdf(pdf_file.name)
+
+            # Read the temporary file content and return it as a response
+            with open(pdf_file.name, 'rb') as f:
+                pdf_content = f.read()
+
+            # Delete the temporary file after use
+            pdf_file.close()
+
+            # Return the file as a downloadable attachment
+            return HttpResponse(pdf_content, content_type='application/pdf', headers={
+                                    'Content-Disposition': 'attachment; filename="user_data.pdf"',
+                                })
+            # response = HttpResponse(pdf_content, content_type='application/pdf')
+            # response['Content-Disposition'] = 'attachment; filename="user_data.pdf"'
+            # return response
+
+       
 
         # Sort by criteria
         if sort_by == 'recent':

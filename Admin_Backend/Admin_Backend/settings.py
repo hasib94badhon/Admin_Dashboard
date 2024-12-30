@@ -15,10 +15,10 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# CORS_ALLOWED_ORIGINS = [
-#     "http://localhost:4278",  # Add the Flutter web app URL
-#     "http://127.0.0.1:1200"
-# ]
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:11297",  # Add the Flutter web app URL
+    "http://127.0.0.1:1200"
+]
 
 # OR, if you want to allow all origins (not recommended for production):
 CORS_ALLOW_ALL_ORIGINS = True
