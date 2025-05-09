@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_web_dashboard/pages/overview/widgets/info_card.dart';
 import 'package:http/http.dart' as http;
+import'package:flutter_web_dashboard/config.dart';
 
 class OverviewCardsLargeScreen extends StatefulWidget {
   const OverviewCardsLargeScreen({super.key});
@@ -21,7 +22,7 @@ class _OverviewCardsLargeScreenState extends State<OverviewCardsLargeScreen> {
   Future<void> fetchCounts() async {
     try {
       final response = await http.get(
-        Uri.parse('http://127.0.0.1:1200/api/count'),
+        Uri.parse('$host/api/count'),
       );
       if (response.statusCode == 200) {
         final data = json.decode(response.body);

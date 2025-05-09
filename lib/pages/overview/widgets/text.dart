@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:html' as html; // Import for HTML operations
 import 'dart:typed_data';
+import'package:flutter_web_dashboard/config.dart';
 
 class InsertPage extends StatefulWidget {
   const InsertPage({Key? key}) : super(key: key);
@@ -54,7 +55,7 @@ class _InsertPageState extends State<InsertPage> {
       return;
     }
 
-    final uri = Uri.parse('http://your_api_url/insert-cat/'); // API URL
+    final uri = Uri.parse('$host/insert-cat/'); // API URL
     var request = http.MultipartRequest('POST', uri)
       ..fields['cat_name'] = catNameController.text
       ..files.add(await http.MultipartFile.fromBytes(

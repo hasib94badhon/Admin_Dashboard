@@ -10,6 +10,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_web_dashboard/widgets/custom_text.dart';
 import 'dart:html' as html;
+import'package:flutter_web_dashboard/config.dart';
 
 class Clientstable extends StatefulWidget {
   const Clientstable({super.key});
@@ -32,7 +33,7 @@ class _ClientstableState extends State<Clientstable> {
 
     try {
       // Base API URL
-      String apiUrl = 'http://127.0.0.1:1200/get-users/';
+      String apiUrl = '$host/get-users/';
       if (userId != null && userId.isNotEmpty) {
         apiUrl += '?search=$userId';
       } else {
@@ -134,7 +135,7 @@ class _ClientstableState extends State<Clientstable> {
 
   Future<void> downloadUserData(BuildContext context, String? userId) async {
     try {
-      String apiUrl = 'http://127.0.0.1:1200/download-user/?user_id=$userId';
+      String apiUrl = '$host/download-user/?user_id=$userId';
       final response = await http.get(Uri.parse(apiUrl));
 
       if (response.statusCode == 200) {
@@ -172,7 +173,7 @@ class _ClientstableState extends State<Clientstable> {
   }
 
   Future<void> usertoggleStatus(int userId) async {
-    final url = Uri.parse('http://127.0.0.1:1200/user-toggle-status/$userId/');
+    final url = Uri.parse('$host/user-toggle-status/$userId/');
 
     try {
       final response = await http.post(url);
@@ -189,7 +190,7 @@ class _ClientstableState extends State<Clientstable> {
 
   Future<void> usertypetoggleStatus(int userId) async {
     final url =
-        Uri.parse('http://127.0.0.1:1200/user-type-toggle-status/$userId/');
+        Uri.parse('$host/user-type-toggle-status/$userId/');
 
     try {
       final response = await http.post(url);
