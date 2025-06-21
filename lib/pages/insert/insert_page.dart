@@ -10,6 +10,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:html' as html; // Import this package for HTML operations
 import 'dart:typed_data';
+import 'package:flutter_web_dashboard/config.dart';
 
 class InsertPage extends StatefulWidget {
   const InsertPage({Key? key}) : super(key: key);
@@ -30,7 +31,7 @@ class _InsertPageState extends State<InsertPage> {
   Future<void> pickExcelFile() async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['xlsx'], // Restrict to Excel files
+      allowedExtensions: ['xlsx', 'xls', 'xlsm'], // Restrict to Excel files
       withData: true, // Important: This ensures `bytes` is populated
     );
 
@@ -58,8 +59,7 @@ class _InsertPageState extends State<InsertPage> {
       isUploading = true;
     });
 
-    final uri =
-        Uri.parse("http://127.0.0.1:1200/upload-users/"); // API endpoint
+    final uri = Uri.parse("$host/upload-users/"); // API endpoint
     var request = http.MultipartRequest("POST", uri);
 
     // Add file data as bytes
@@ -74,6 +74,98 @@ class _InsertPageState extends State<InsertPage> {
       if (response.statusCode == 201) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Data uploaded successfully!")),
+        );
+      } else {
+        var responseBody = await response.stream.bytesToString();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Upload failed: $responseBody")),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e")),
+      );
+    } finally {
+      setState(() {
+        isUploading = false;
+      });
+    }
+  }
+
+  // Function to upload hotline numbers (similar to user upload)
+  Future<void> uploadHotlineNumbers() async {
+    if (selectedFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please select an Excel file to upload.")),
+      );
+      return;
+    }
+
+    setState(() {
+      isUploading = true;
+    });
+
+    final uri = Uri.parse("$host/upload-hotline-numbers/"); // API endpoint
+    var request = http.MultipartRequest("POST", uri);
+
+    // Add file data as bytes
+    request.files.add(http.MultipartFile.fromBytes(
+      "file",
+      selectedFile!.bytes!, // Use `bytes` property for the web platform
+      filename: selectedFile!.name,
+    ));
+
+    try {
+      var response = await request.send();
+      if (response.statusCode == 201) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content: Text("Hotline numbers uploaded successfully!")),
+        );
+      } else {
+        var responseBody = await response.stream.bytesToString();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Upload failed: $responseBody")),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e")),
+      );
+    } finally {
+      setState(() {
+        isUploading = false;
+      });
+    }
+  }
+
+  Future<void> uploadapps() async {
+    if (selectedFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please select an Excel file to upload.")),
+      );
+      return;
+    }
+
+    setState(() {
+      isUploading = true;
+    });
+
+    final uri = Uri.parse("$host/upload-apps/"); // API endpoint
+    var request = http.MultipartRequest("POST", uri);
+
+    // Add file data as bytes
+    request.files.add(http.MultipartFile.fromBytes(
+      "file",
+      selectedFile!.bytes!, // Use `bytes` property for the web platform
+      filename: selectedFile!.name,
+    ));
+
+    try {
+      var response = await request.send();
+      if (response.statusCode == 201) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Apps are uploaded successfully!")),
         );
       } else {
         var responseBody = await response.stream.bytesToString();
@@ -129,7 +221,7 @@ class _InsertPageState extends State<InsertPage> {
       return;
     }
 
-    final uri = Uri.parse('http://127.0.0.1:1200/insert-cat/'); // API URL
+    final uri = Uri.parse('$host/insert-cat/'); // API URL
     var request = http.MultipartRequest('POST', uri)
       ..fields['cat_name'] = catNameController.text
       ..files.add(await http.MultipartFile.fromBytes(
@@ -176,7 +268,8 @@ class _InsertPageState extends State<InsertPage> {
             DropdownButton<String>(
               isExpanded: true,
               value: selectedOption,
-              items: ["User", "Category"].map((String value) {
+              items: ["User", "Category", "Hotline Numbers", "Apps", "FB Page"]
+                  .map((String value) {
                 return DropdownMenuItem<String>(
                   value: value,
                   child: Text(value),
@@ -192,6 +285,9 @@ class _InsertPageState extends State<InsertPage> {
             const SizedBox(height: 20),
             if (selectedOption == "User") _buildUserForm(),
             if (selectedOption == "Category") _buildCategoryForm(),
+            if (selectedOption == "Hotline Numbers") _buildHotlineNumbersForm(),
+            if (selectedOption == "Apps") _buildAppsForm(),
+            // if (selectedOption == "FB Page") _buildfbForm(),
           ],
         ),
       ),
@@ -228,6 +324,54 @@ class _InsertPageState extends State<InsertPage> {
           child: isUploading
               ? const CircularProgressIndicator(color: Colors.white)
               : const Text("Upload Data"),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHotlineNumbersForm() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Upload Hotline Numbers",
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+        ),
+        const SizedBox(height: 10),
+        const Text(
+          """
+  To ensure a smooth and accurate data upload from your excel file to our database, please adhere to the following guidelines:
+
+1. Required columns: your excel sheet must contain precisely four columns with these headers: 'name', 'phone', 'category', and 'photo'.
+
+2. Data validation: for successful upload, each row needs complete data in the 'name', 'phone', and 'category' columns. any row missing information in these essential fields will be automatically excluded.
+
+3. Lowercase content & Sheet name: all words within the cells of your excel sheet should be lowercase. additionally, please ensure the sheet name in your excel file is  "data" """,
+          style: TextStyle(
+              fontSize: 16, fontWeight: FontWeight.w500, color: Colors.red),
+        ),
+        const SizedBox(height: 30),
+        ElevatedButton.icon(
+          onPressed: pickExcelFile,
+          icon: const Icon(Icons.upload_file),
+          label: const Text("Select Excel Sheet"),
+        ),
+        const SizedBox(height: 10),
+        selectedFile != null
+            ? Text(
+                "Selected File: ${selectedFile!.name}",
+                style: const TextStyle(color: Colors.green),
+              )
+            : const Text(
+                "No file selected",
+                style: TextStyle(color: Colors.red),
+              ),
+        const SizedBox(height: 20),
+        ElevatedButton(
+          onPressed: isUploading ? null : uploadHotlineNumbers,
+          child: isUploading
+              ? const CircularProgressIndicator(color: Colors.white)
+              : const Text("Upload Hotline Numbers"),
         ),
       ],
     );
@@ -281,6 +425,51 @@ class _InsertPageState extends State<InsertPage> {
             icon: const Icon(Icons.upload),
             label: const Text("CREATE"),
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildAppsForm() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Upload Apps links",
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+        ),
+        const SizedBox(height: 10),
+        const Text(
+          """
+  To ensure a smooth and accurate apps data upload from your excel file to our database, please adhere to the following guidelines:
+1. Required columns: your excel sheet must contain precisely four columns with these headers: 'name', 'web','address', 'category', and 'photo'.
+2. Data validation: for successful upload, each row needs complete data in the 'name', 'web', and 'category' columns. any row missing information in these essential fields will be automatically excluded.
+3. Lowercase content & Sheet name: all words within the cells of your excel sheet should be lowercase. additionally, please ensure the sheet name in your excel file is  "apps" """,
+          style: TextStyle(
+              fontSize: 13, fontWeight: FontWeight.w500, color: Colors.red),
+        ),
+        const SizedBox(height: 30),
+        ElevatedButton.icon(
+          onPressed: pickExcelFile,
+          icon: const Icon(Icons.upload_file),
+          label: const Text("Select Excel Sheet"),
+        ),
+        const SizedBox(height: 10),
+        selectedFile != null
+            ? Text(
+                "Selected File: ${selectedFile!.name}",
+                style: const TextStyle(color: Colors.green),
+              )
+            : const Text(
+                "No file selected",
+                style: TextStyle(color: Colors.red),
+              ),
+        const SizedBox(height: 20),
+        ElevatedButton(
+          onPressed: isUploading ? null : uploadapps,
+          child: isUploading
+              ? const CircularProgressIndicator(color: Colors.white)
+              : const Text("Upload Apps"),
         ),
       ],
     );

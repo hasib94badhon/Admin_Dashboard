@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter_web_dashboard/config.dart';
 
 class CatTable extends StatefulWidget {
   const CatTable({Key? key}) : super(key: key);
@@ -11,7 +12,7 @@ class CatTable extends StatefulWidget {
 
 class _CatTableState extends State<CatTable> {
   Future<List<dynamic>> fetchData() async {
-    final response = await http.get(Uri.parse('http://127.0.0.1:1200/api/cat'));
+    final response = await http.get(Uri.parse('$host/api/cat'));
     if (response.statusCode == 200) {
       return json.decode(response.body);
     } else {
@@ -20,7 +21,7 @@ class _CatTableState extends State<CatTable> {
   }
 
   Future<void> toggleStatus(int categoryId) async {
-    final url = Uri.parse('http://127.0.0.1:1200/toggle-status/$categoryId/');
+    final url = Uri.parse('$host/toggle-status/$categoryId/');
 
     try {
       final response = await http.post(url);

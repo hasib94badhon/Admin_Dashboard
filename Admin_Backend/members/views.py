@@ -19,6 +19,7 @@ from datetime import datetime
 from django.shortcuts import get_object_or_404
 from weasyprint import HTML
 import tempfile
+from unicodedata import normalize
 
 
 # def data_view(request):
@@ -177,6 +178,195 @@ def upload_excel(request):
         fs.delete(filename)
 
         return JsonResponse({"message": "File processed successfully"}, status=201)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+
+@csrf_exempt
+def upload_hotline_numbers_excel(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Only POST requests are allowed"}, status=405)
+
+    if "file" not in request.FILES:
+        return JsonResponse({"error": "No file provided"}, status=400)
+
+    file = request.FILES["file"]
+
+    try:
+        # Save uploaded Excel file temporarily
+        fs = FileSystemStorage()
+        filename = fs.save(file.name, file)
+        filepath = fs.path(filename)
+
+        # Read Excel sheet named "data"
+        data = pd.read_excel(filepath, sheet_name='hotlines')
+
+        # Loop through each row in the Excel sheet
+        for index, row in data.iterrows():
+    
+            raw_name = row.get("name", "")
+            name = str(raw_name).strip() if pd.notnull(raw_name) else ""
+
+            # Handle phone
+            raw_phone = row.get("phone", "")
+            if pd.notnull(raw_phone):
+                if isinstance(raw_phone, float):
+                    phone = str(int(raw_phone)).strip()
+                else:
+                    phone = str(raw_phone).strip()
+            else:
+                phone = ""
+
+            # Handle category
+            category = str(row.get("category", "")).strip() if pd.notnull(row.get("category", "")) else ""
+
+            # Handle photo
+            photo = str(row.get("photo", "")).strip() if pd.notnull(row.get("photo", "")) else ""
+
+            # Skip if essential fields are empty
+            if not name or not phone or not category:
+                continue
+
+            # Insert after checking duplicates
+            if not HotlineNumbers.objects.filter(name=name, phone=phone).exists():
+                HotlineNumbers.objects.create(
+                    name=name,
+                    phone=phone,
+                    category=category,
+                    photo=photo
+                )
+
+
+        # Delete the uploaded temp file
+        fs.delete(filename)
+
+        return JsonResponse({"message": "Hotline numbers uploaded successfully"}, status=201)
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+#Insert useful app links from excel file
+@csrf_exempt
+def apps_links_excel(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Only POST requests are allowed"}, status=405)
+
+    if "file" not in request.FILES:
+        return JsonResponse({"error": "No file provided"}, status=400)
+
+    file = request.FILES["file"]
+
+    try:
+        fs = FileSystemStorage()
+        filename = fs.save(file.name, file)
+        filepath = fs.path(filename)
+
+        data = pd.read_excel(filepath, sheet_name='apps')
+
+        for index, row in data.iterrows():
+            name = str(row.get("name", "")).strip().lower() if pd.notnull(row.get("name", "")) else ""
+            web = str(row.get("web", "")).strip().lower() if pd.notnull(row.get("web", "")) else ""
+            address = str(row.get("address", "")).strip().lower() if pd.notnull(row.get("address", "")) else ""
+            category = str(row.get("category", "")).strip().lower() if pd.notnull(row.get("category", "")) else ""
+            photo = str(row.get("photo", "")).strip().lower() if pd.notnull(row.get("photo", "")) else ""
+
+            if not name or not web or not category:
+                continue
+
+            if not Apps.objects.filter(name__iexact=name, web__iexact=web).exists():
+                Apps.objects.create(
+                    name=name,
+                    web=web,
+                    category=category,
+                    photo=photo,
+                    address=address
+                )
+
+        fs.delete(filename)
+        return JsonResponse({"message": "Apps are uploaded successfully"}, status=201)
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
+# insert fb_page page from excel file 
+
+@csrf_exempt
+def fb_page_excel(request):
+    if request.method != "POST":
+        return JsonResponse({"error": "Only POST requests are allowed"}, status=405)
+
+    if "file" not in request.FILES:
+        return JsonResponse({"error": "No file provided"}, status=400)
+
+    file = request.FILES["file"]
+
+    try:
+        # Save uploaded Excel file temporarily
+        fs = FileSystemStorage()
+        filename = fs.save(file.name, file)
+        filepath = fs.path(filename)
+
+        # Read Excel sheet named "data"
+        data = pd.read_excel(filepath, sheet_name='fb_page')
+
+        # Loop through each row in the Excel sheet
+        for index, row in data.iterrows():
+    
+            # raw_name = row.get("name", "")
+            name = str(row.get("name", "")).strip() if pd.notnull(name) else ""
+
+            # Handle phone
+            # raw_web = row.get("web", "")
+            web = str(row.get("web","")).strip() if pd.notnull(web) else ""
+            # raw_address = row.get("web", "")
+            address = str(row.get("address", "")).strip() if pd.notnull(address) else ""
+
+            raw_phone = row.get("phone", "")
+            if pd.notnull(raw_phone):
+                if isinstance(raw_phone, float):
+                    phone = "0"+str(int(raw_phone)).strip()
+                else:
+                    phone = "0"+str(raw_phone).strip()
+            else:
+                phone = ""
+            # if pd.notnull(raw_web):
+            #     if isinstance(raw_web, float):
+            #         phone = str(int(raw_web)).strip()
+            #     else:
+            #         phone = str(raw_web).strip()
+            # else:
+            #     phone = ""
+
+            # Handle category
+            category = str(row.get("category", "")).strip() if pd.notnull(row.get("category", "")) else ""
+
+            # Handle photo
+            # photo = str(row.get("photo", "")).strip() if pd.notnull(row.get("photo", "")) else ""
+
+            # Skip if essential fields are empty
+            if not name or not web or not category or not phone:
+                continue
+
+            # Insert after checking duplicates
+            if not FbPage.objects.filter(name=name, web=web).exists():
+                Apps.objects.create(
+                    name = name,
+                    cat = category,
+                    phone = phone,
+                    location = address,
+                    link = web
+
+                )
+
+
+        # Delete the uploaded temp file
+        fs.delete(filename)
+
+        return JsonResponse({"message": "fb pages are uploaded successfully"}, status=201)
+
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
 

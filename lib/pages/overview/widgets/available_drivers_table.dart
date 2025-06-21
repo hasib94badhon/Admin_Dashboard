@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import "package:flutter_web_dashboard/config.dart";
 
 // CustomText widget is assumed to be defined elsewhere in your project.
 
@@ -9,8 +10,7 @@ class AvailableDriversTable extends StatelessWidget {
 
   // Fetch data from the API
   Future<List<dynamic>> fetchData() async {
-    final response =
-        await http.get(Uri.parse('http://127.0.0.1:1200/api/users'));
+    final response = await http.get(Uri.parse('$host/api/users'));
     if (response.statusCode == 200) {
       return json.decode(response.body);
     } else {

@@ -183,7 +183,7 @@ class FbPage(models.Model):
     phone = models.IntegerField()
     link = models.CharField(max_length=255)
     location = models.CharField(max_length=255)
-    time = models.DateTimeField()
+    time = models.DateTimeField(auto_now=True)
 
     class Meta:
         managed = False
@@ -195,6 +195,7 @@ class HotlineNumbers(models.Model):
     phone = models.CharField(max_length=255)
     category = models.CharField(max_length=255)
     photo = models.CharField(max_length=255)
+    
 
     class Meta:
         managed = False

@@ -17,7 +17,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:11297",  # Add the Flutter web app URL
-    "http://127.0.0.1:1200"
+    "http://127.0.0.1:8080"
 ]
 
 # OR, if you want to allow all origins (not recommended for production):
