@@ -10,7 +10,11 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:html' as html; // Import this package for HTML operations
 import 'dart:typed_data';
+<<<<<<< HEAD
 import 'package:flutter_web_dashboard/config.dart';
+=======
+import'package:flutter_web_dashboard/config.dart';
+>>>>>>> 6c736d0932110085b7e83a0d2968fbbc51a94ad9
 
 class InsertPage extends StatefulWidget {
   const InsertPage({Key? key}) : super(key: key);
@@ -21,7 +25,10 @@ class InsertPage extends StatefulWidget {
 
 class _InsertPageState extends State<InsertPage> {
   String? selectedOption;
+  String? selectedtype;
   TextEditingController catNameController = TextEditingController();
+  TextEditingController serviceController = TextEditingController();
+  TextEditingController shopController = TextEditingController();
   html.File? selectedImage; // Store the selected image
   Uint8List? imageBytes; // Store image bytes for display
   PlatformFile? selectedFile; // Store the file data
@@ -59,7 +66,12 @@ class _InsertPageState extends State<InsertPage> {
       isUploading = true;
     });
 
+<<<<<<< HEAD
     final uri = Uri.parse("$host/upload-users/"); // API endpoint
+=======
+    final uri =
+        Uri.parse("$host/upload-users/"); // API endpoint
+>>>>>>> 6c736d0932110085b7e83a0d2968fbbc51a94ad9
     var request = http.MultipartRequest("POST", uri);
 
     // Add file data as bytes
@@ -221,9 +233,18 @@ class _InsertPageState extends State<InsertPage> {
       return;
     }
 
+<<<<<<< HEAD
+=======
+    bool isService = selectedtype == 'service';
+    bool isShop = selectedtype == 'shop';
+
+>>>>>>> 6c736d0932110085b7e83a0d2968fbbc51a94ad9
     final uri = Uri.parse('$host/insert-cat/'); // API URL
     var request = http.MultipartRequest('POST', uri)
       ..fields['cat_name'] = catNameController.text
+      ..fields['yes_service'] = isService.toString()
+      ..fields['yes_shop'] = isShop.toString()
+
       ..files.add(await http.MultipartFile.fromBytes(
         'cat_logo',
         imageBytes!, // Use the bytes to send the file
@@ -394,6 +415,23 @@ class _InsertPageState extends State<InsertPage> {
           ),
           maxLines: 3,
         ),
+        const SizedBox(height: 20),
+        DropdownButton<String>(
+              isExpanded: true,
+              value: selectedtype,
+              items: ["service", "shop"].map((String value) {
+                return DropdownMenuItem<String>(
+                  value: value,
+                  child: Text(value),
+                );
+              }).toList(),
+              onChanged: (value) {
+                setState(() {
+                  selectedtype= value;
+                });
+              },
+              hint: const Text("Choose an type"),
+            ),
         const SizedBox(height: 20),
         const Text(
           "Upload Category Picture",

@@ -109,6 +109,8 @@ class Cat(models.Model):
     user_count = models.IntegerField(blank=True, null=True)
     cat_used = models.IntegerField(blank=True, null=True)
     status = models.BooleanField(default=True)
+    yes_service = models.BooleanField(default=False)
+    yes_shop = models.BooleanField(default=False)
 
     class Meta:
         managed = False

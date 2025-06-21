@@ -26,6 +26,8 @@ from unicodedata import normalize
 #     data = list(Users.objects.values())
 #     return JsonResponse({'data': data})
 
+def str_to_bool(val):
+    return val.lower() in ('true', '1', 'yes','True','False')
 class UsersAPIView(APIView):
     def get(self, request):
         users = Users.objects.all()  # Query all products
@@ -77,9 +79,25 @@ def insert_cat(request):
     if request.method == 'POST':
         cat_name = request.POST.get('cat_name')
         cat_logo = request.FILES.get('cat_logo')
+        is_service = str_to_bool(request.POST.get('yes_service'.lower(), 'false'))
+        is_shop = str_to_bool(request.POST.get('yes_shop'.lower(), 'false'))
+        
+       
+        if is_service == 'True' and is_shop == 'False':
+            is_service = 1
+            is_shop = 0
+        
+        if is_service == 'False' and is_shop == 'True':
+            is_service = 0
+            is_shop = 1
+        
+            
+        print(is_service)   
+        print(is_shop)
+        
 
         if not (cat_name and cat_logo):
-            return JsonResponse({"error": "cat_name and cat_logo are required!"}, status=400)
+            return JsonResponse({"error": "cat_name,cat_logo,is_service,is_shop are required!"}, status=400)
 
         # Save the photo to an FTP server
         ftp_server = '89.117.27.223'
@@ -91,6 +109,7 @@ def insert_cat(request):
 
         # Connect to FTP server
         ftp = FTP(ftp_server,ftp_username,ftp_password)
+        
         try:
             ftp.connect(ftp_server)
             ftp.login(user=ftp_username, passwd=ftp_password)
@@ -102,7 +121,7 @@ def insert_cat(request):
                 print("Upload to the ftp successfully")
             
             # Save data to the database
-            cat = Cat(cat_name=cat_name, cat_logo=file_name)
+            cat = Cat(cat_name=cat_name, cat_logo=file_name,yes_service=is_service,yes_shop=is_shop)
             cat.save()
 
             ftp.quit()
@@ -449,6 +468,8 @@ def get_users(request):
         download = request.GET.get('download', None) 
 
         users = Users.objects.all()
+        cats = Cat.objects.all()
+        print(type(cats))
 
 
         if search:
@@ -465,16 +486,24 @@ def get_users(request):
          #Query users
         if user_id:  # Fetch a specific user
             users = Users.objects.filter(user_id=user_id)
+            
             if not users.exists():
                 return JsonResponse({'error': 'User not found'}, status=404)
         else:  # Fetch all users
             users = Users.objects.all()
         
-        user_data = list(users.values(
-            'user_id', 'name', 'phone', 'description', 'location', 'photo',
-            'user_type', 'status', 'user_shared', 'user_viewed', 'user_called',
-            'user_total_post', 'user_logged_date', 'cat_id'
-        ))
+        user_data = list(users.select_related('cat_id').values(
+        'user_id', 'name', 'phone', 'description', 'location', 'photo',
+        'user_type', 'status', 'user_shared', 'user_viewed', 'user_called',
+        'user_total_post', 'user_logged_date', 'cat_id',
+        'cat_id__cat_name'  # <-- Fetch cat_name from related Cat model
+    ))
+       
+        
+        
+            
+        
+        
 
         # if download:  # Generate a PDF if the 'download' parameter is set
         #     # Render data in HTML template for PDF
@@ -542,11 +571,15 @@ def get_users(request):
             return JsonResponse({'error': 'Invalid sort parameter'}, status=400)
 
         # Format response for multiple users
-        user_data = list(users.values(
-            'user_id', 'name', 'phone', 'description', 'location', 'photo',
-            'user_type', 'status', 'user_shared', 'user_viewed', 'user_called',
-            'user_total_post', 'user_logged_date', 'cat_id'
-        ))
+       
+        user_data = list(users.select_related('cat_id').values(
+                'user_id', 'name', 'phone', 'description', 'location', 'photo',
+                'user_type', 'status', 'user_shared', 'user_viewed', 'user_called',
+                'user_total_post', 'user_logged_date', 'cat_id',
+                'cat_id__cat_name'  # <-- Fetch cat_name from related Cat model
+            ))
+        
+        
 
         return JsonResponse({'users': user_data}, status=200, safe=False)
 

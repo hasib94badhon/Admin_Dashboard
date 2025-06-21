@@ -2,7 +2,11 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_web_dashboard/pages/overview/widgets/info_card.dart';
 import 'package:http/http.dart' as http;
+<<<<<<< HEAD
 import "package:flutter_web_dashboard/config.dart";
+=======
+import'package:flutter_web_dashboard/config.dart';
+>>>>>>> 6c736d0932110085b7e83a0d2968fbbc51a94ad9
 
 class OverviewCardsLargeScreen extends StatefulWidget {
   const OverviewCardsLargeScreen({super.key});
