@@ -10,7 +10,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_web_dashboard/widgets/custom_text.dart';
 import 'dart:html' as html;
-import'package:flutter_web_dashboard/config.dart';
+import 'package:flutter_web_dashboard/config.dart';
 
 class Clientstable extends StatefulWidget {
   const Clientstable({super.key});
@@ -87,50 +87,6 @@ class _ClientstableState extends State<Clientstable> {
         isLoading = false;
       });
     }
-
-    // try {
-    //   // Base API URL
-    //   String apiUrl = 'http://127.0.0.1:1200/get-users/';
-    //   if (userId != null && userId.isNotEmpty) {
-    //     apiUrl += '?search=$userId';
-    //   } else {
-    //     apiUrl += '?sort=${selectedSort.toLowerCase()}';
-    //   }
-
-    //   // Fetch data from API
-    //   final response = await http.get(Uri.parse(apiUrl));
-    //   if (response.statusCode == 200) {
-    //     final responseData = json.decode(response.body);
-
-    //     // Handle specific user vs multiple users
-    //     if (userId != null &&
-    //         userId.isNotEmpty &&
-    //         responseData.containsKey('user')) {
-    //       setState(() {
-    //         userData = [responseData['user']]; // Single user data as a list
-    //       });
-    //     } else if (responseData.containsKey('users')) {
-    //       setState(() {
-    //         userData = responseData['users']; // Full list of users
-    //       });
-    //     } else {
-    //       setState(() {
-    //         userData = []; // No data found
-    //       });
-    //     }
-    //   } else {
-    //     throw Exception("Failed to load data");
-    //   }
-    // } catch (e) {
-    //   print("Error: $e");
-    //   setState(() {
-    //     userData = [];
-    //   });
-    // } finally {
-    //   setState(() {
-    //     isLoading = false;
-    //   });
-    // }
   }
 
   Future<void> downloadUserData(BuildContext context, String? userId) async {
@@ -189,8 +145,7 @@ class _ClientstableState extends State<Clientstable> {
   }
 
   Future<void> usertypetoggleStatus(int userId) async {
-    final url =
-        Uri.parse('$host/user-type-toggle-status/$userId/');
+    final url = Uri.parse('$host/user-type-toggle-status/$userId/');
 
     try {
       final response = await http.post(url);
@@ -362,10 +317,19 @@ class _ClientstableState extends State<Clientstable> {
                             columns: const [
                               DataColumn2(
                                 label: Text("UserID"),
+                                size: ColumnSize.S,
+                              ),
+                              DataColumn2(
+                                label: Text('Category'),
                                 size: ColumnSize.L,
                               ),
-                              DataColumn(
-                                label: Text('Category'),
+                              DataColumn2(
+                                label: Text('Name'),
+                                size: ColumnSize.L,
+                              ),
+                              DataColumn2(
+                                label: Text('Phone Number'),
+                                size: ColumnSize.L,
                               ),
                               DataColumn(
                                 label: Text('User called'),
@@ -385,8 +349,16 @@ class _ClientstableState extends State<Clientstable> {
                                       text: userData[index]['user_id']
                                           .toString())),
                                   DataCell(CustomText(
-                                      text: userData[index]['cat_id']
+                                      text: userData[index]['cat__cat_name']
                                           .toString())),
+                                  DataCell(CustomText(
+                                      text:
+                                          userData[index]['name'].toString())),
+                                  DataCell(CustomText(
+                                    text: userData[index]['phone'].toString(),
+                                    color:
+                                        const Color.fromARGB(255, 1, 104, 54),
+                                  )),
                                   DataCell(Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [

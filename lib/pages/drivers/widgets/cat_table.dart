@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-<<<<<<< HEAD
 import 'package:flutter_web_dashboard/config.dart';
-=======
-import'package:flutter_web_dashboard/config.dart';
->>>>>>> 6c736d0932110085b7e83a0d2968fbbc51a94ad9
 
 class CatTable extends StatefulWidget {
   const CatTable({Key? key}) : super(key: key);
@@ -85,16 +81,18 @@ class _CatTableState extends State<CatTable> {
                 data.length,
                 (index) {
                   final cat = data[index];
+
                   return DataRow(cells: [
                     DataCell(Row(
                       children: [
                         CircleAvatar(
                           backgroundImage: NetworkImage(
-                            'https://aarambd.com/cat logo/${cat['cat_logo']}',
+                            Uri.encodeFull(
+                                'https://aarambd.com/cat logo/${cat['cat_logo']}'),
                           ),
                           radius: 20,
-                          onBackgroundImageError: (_, __) {
-                            // Placeholder for missing images
+                          onBackgroundImageError: (exception, stackTrace) {
+                            print('Image load failed: $exception');
                           },
                         ),
                         const SizedBox(width: 10),

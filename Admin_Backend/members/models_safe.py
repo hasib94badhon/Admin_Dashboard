@@ -8,20 +8,6 @@
 from django.db import models
 
 
-class AboutInfo(models.Model):
-    about = models.TextField(blank=True, null=True)
-    founders = models.TextField(blank=True, null=True)
-    sponsors = models.TextField(blank=True, null=True)
-    office_address = models.TextField(blank=True, null=True)
-    contact = models.TextField(blank=True, null=True)
-    goals = models.TextField(blank=True, null=True)
-    quote = models.TextField(blank=True, null=True)
-    last_updated = models.DateTimeField(blank=True, null=True)
-
-    class Meta:
-        managed = False
-        db_table = 'about_info'
-
 
 class Apps(models.Model):
     app_id = models.AutoField(primary_key=True)
@@ -30,10 +16,6 @@ class Apps(models.Model):
     address = models.CharField(max_length=255)
     photo = models.CharField(max_length=255)
     category = models.CharField(max_length=255)
-    android_link = models.TextField(blank=True, null=True)
-    ios_link = models.TextField(blank=True, null=True)
-    deeplink = models.CharField(max_length=255, blank=True, null=True)
-    visit_count = models.IntegerField()
 
     class Meta:
         managed = False
@@ -114,23 +96,10 @@ class CallList(models.Model):
     call_time = models.DateTimeField()
     call_user = models.ForeignKey('Users', models.DO_NOTHING)
     user = models.ForeignKey('Users', models.DO_NOTHING, related_name='calllist_user_set')
-    call_count = models.BigIntegerField()
 
     class Meta:
         managed = False
         db_table = 'call_list'
-        unique_together = (('call_user', 'user'),)
-
-
-class CallListBackup(models.Model):
-    call_id = models.IntegerField()
-    call_time = models.DateTimeField()
-    call_user_id = models.IntegerField()
-    user_id = models.IntegerField()
-
-    class Meta:
-        managed = False
-        db_table = 'call_list_backup'
 
 
 class Cat(models.Model):
@@ -140,17 +109,21 @@ class Cat(models.Model):
     user_count = models.IntegerField(blank=True, null=True)
     cat_used = models.IntegerField(blank=True, null=True)
     status = models.BooleanField(default=True)
-    yes_service = models.IntegerField()
-    yes_shop = models.IntegerField()
+    yes_service = models.BooleanField(default=False)
+    yes_shop = models.BooleanField(default=False)
 
     class Meta:
         managed = False
         db_table = 'cat'
+    def __str__(self):
+        return self.name
 
 
 class Comment(models.Model):
     com_id = models.AutoField(primary_key=True)
-    com_text = models.TextField()
+    com_text = models.CharField(max_length=255)
+    com_like = models.IntegerField()
+    com_dislike = models.IntegerField()
     com_time = models.DateTimeField()
     com_user = models.ForeignKey('Users', models.DO_NOTHING)
     post = models.ForeignKey('Post', models.DO_NOTHING)
@@ -160,39 +133,14 @@ class Comment(models.Model):
         db_table = 'comment'
 
 
-class DesCat(models.Model):
-    des_cat_id = models.AutoField(primary_key=True)
-    des_cat_name = models.CharField(max_length=255)
-    des_cat_status = models.IntegerField()
-
-    class Meta:
-        managed = False
-        db_table = 'des_cat'
-
-
-class Description(models.Model):
-    des_id = models.AutoField(primary_key=True)
-    user_id = models.IntegerField()
-    time = models.DateTimeField(blank=True, null=True)
-    des = models.TextField()
-    des_photo = models.CharField(max_length=255, blank=True, null=True)
-    des_view = models.IntegerField()
-    des_com = models.IntegerField()
-    des_cat = models.ForeignKey(DesCat, models.DO_NOTHING, blank=True, null=True)
-
-    class Meta:
-        managed = False
-        db_table = 'description'
-
-
 class DjangoAdminLog(models.Model):
     action_time = models.DateTimeField()
     object_id = models.TextField(blank=True, null=True)
     object_repr = models.CharField(max_length=200)
     action_flag = models.PositiveSmallIntegerField()
     change_message = models.TextField()
-    content_type_id = models.IntegerField(blank=True, null=True)
-    user_id = models.IntegerField()
+    content_type = models.ForeignKey('DjangoContentType', models.DO_NOTHING, blank=True, null=True)
+    user = models.ForeignKey(AuthUser, models.DO_NOTHING)
 
     class Meta:
         managed = False
@@ -230,26 +178,14 @@ class DjangoSession(models.Model):
         db_table = 'django_session'
 
 
-class FavoriteUsers(models.Model):
-    fav_id = models.AutoField(primary_key=True)
-    user_id = models.IntegerField()
-    fav_users = models.IntegerField()
-
-    class Meta:
-        managed = False
-        db_table = 'favorite_users'
-
-
 class FbPage(models.Model):
     page_id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=255)
     cat = models.CharField(max_length=255)
-    photo = models.CharField(max_length=255)
     phone = models.IntegerField()
     link = models.CharField(max_length=255)
     location = models.CharField(max_length=255)
-    time = models.DateTimeField()
-    visit_count = models.IntegerField()
+    time = models.DateTimeField(auto_now=True)
 
     class Meta:
         managed = False
@@ -261,51 +197,33 @@ class HotlineNumbers(models.Model):
     phone = models.CharField(max_length=255)
     category = models.CharField(max_length=255)
     photo = models.CharField(max_length=255)
+    
 
     class Meta:
         managed = False
         db_table = 'hotline_numbers'
 
 
-class Location(models.Model):
-    loc_id = models.AutoField(primary_key=True)
-    user_id = models.IntegerField(unique=True)
-    lat = models.CharField(max_length=50)
-    lon = models.CharField(max_length=50)
-    address = models.TextField()
-    updated_at = models.DateTimeField(blank=True, null=True)
+class MembersMember(models.Model):
+    id = models.BigAutoField(primary_key=True)
+    firstname = models.CharField(max_length=255)
+    lastname = models.CharField(max_length=255)
 
     class Meta:
         managed = False
-        db_table = 'location'
-
-
-class Notifications(models.Model):
-    user_id = models.IntegerField()
-    type = models.CharField(max_length=7)
-    detail_user = models.IntegerField(blank=True, null=True)
-    created_at = models.DateTimeField(blank=True, null=True)
-    is_read = models.IntegerField(blank=True, null=True)
-    detail_post_id = models.IntegerField()
-    service_id = models.IntegerField()
-    shop_id = models.IntegerField()
-    is_service = models.IntegerField()
-
-    class Meta:
-        managed = False
-        db_table = 'notifications'
+        db_table = 'members_member'
 
 
 class Post(models.Model):
     post_id = models.AutoField(primary_key=True)
-    cat_id = models.IntegerField()
-    user_id = models.IntegerField()
-    post_des = models.TextField(blank=True, null=True)
-    post_media = models.TextField(blank=True, null=True)
-    post_comments = models.IntegerField()
+    cat = models.ForeignKey(Cat, models.DO_NOTHING)
+    user = models.ForeignKey('Users', models.DO_NOTHING)
+    post_des = models.CharField(max_length=355)
+    post_media = models.CharField(max_length=355)
+    post_liked = models.IntegerField()
     post_viewed = models.IntegerField()
-    post_time = models.DateTimeField(blank=True, null=True)
-    post_main_description = models.TextField(blank=True, null=True)
+    post_shared = models.IntegerField()
+    post_time = models.DateTimeField()
 
     class Meta:
         managed = False
@@ -316,9 +234,8 @@ class Reg(models.Model):
     reg_id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=255)
     phone = models.CharField(max_length=11)
-    password = models.CharField(max_length=255)
+    password = models.CharField(max_length=100)
     created_date = models.DateTimeField()
-    secret_number = models.CharField(max_length=10, blank=True, null=True)
 
     class Meta:
         managed = False
@@ -327,14 +244,13 @@ class Reg(models.Model):
 
 class Service(models.Model):
     service_id = models.AutoField(primary_key=True)
-    cat_id = models.IntegerField()
+    cat = models.ForeignKey(Cat, models.DO_NOTHING)
     name = models.CharField(max_length=255)
     location = models.CharField(max_length=255)
-    description = models.TextField()
+    description = models.CharField(max_length=255)
     photo = models.CharField(max_length=255)
     phone = models.IntegerField()
-    date_time = models.DateTimeField()
-    user_id = models.IntegerField()
+    user = models.ForeignKey('Users', models.DO_NOTHING)
 
     class Meta:
         managed = False
@@ -344,9 +260,9 @@ class Service(models.Model):
 class Shop(models.Model):
     shop_id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=255)
-    cat_id = models.IntegerField()
+    cat = models.ForeignKey(Cat, models.DO_NOTHING)
     location = models.CharField(max_length=255)
-    description = models.TextField()
+    description = models.CharField(max_length=255)
     phone = models.IntegerField()
     photo = models.CharField(max_length=255)
     date_time = models.DateTimeField()
@@ -355,19 +271,6 @@ class Shop(models.Model):
     class Meta:
         managed = False
         db_table = 'shop'
-
-
-class Subscribers(models.Model):
-    sub_id = models.AutoField(primary_key=True)
-    user_id = models.IntegerField()
-    reg_id = models.IntegerField()
-    cat_id = models.IntegerField()
-    type = models.CharField(max_length=255)
-    last_pay = models.DateTimeField(blank=True, null=True)
-
-    class Meta:
-        managed = False
-        db_table = 'subscribers'
 
 
 class TermPolicy(models.Model):
@@ -379,70 +282,22 @@ class TermPolicy(models.Model):
         db_table = 'term_policy'
 
 
-class ThoughtComment(models.Model):
-    com_id = models.AutoField(primary_key=True)
-    com_text = models.TextField()
-    com_time = models.DateTimeField(blank=True, null=True)
-    com_user_id = models.IntegerField()
-    des_id = models.IntegerField()
-
-    class Meta:
-        managed = False
-        db_table = 'thought_comment'
-
-
-class UserDeactivations(models.Model):
-    user = models.ForeignKey('Users', models.DO_NOTHING)
-    reason = models.TextField()
-    deactivated_at = models.DateTimeField()
-
-    class Meta:
-        managed = False
-        db_table = 'user_deactivations'
-
-
-class UserReferrals(models.Model):
-    id = models.BigAutoField(primary_key=True)
-    referral_id = models.CharField(max_length=8)
-    referrer_user_id = models.IntegerField()
-    referred_user_id = models.IntegerField(unique=True)
-    referred_cat_id = models.IntegerField()
-    points = models.IntegerField()
-    payment_status = models.CharField(max_length=10)
-    created_at = models.DateTimeField()
-    verification = models.CharField(max_length=20)
-
-    class Meta:
-        managed = False
-        db_table = 'user_referrals'
-
-
 class Users(models.Model):
     user_id = models.AutoField(primary_key=True)
-    reg_id = models.IntegerField()
-    # cat_id = models.IntegerField()
-    cat = models.ForeignKey('Cat', models.DO_NOTHING, db_column='cat_id')
+    reg = models.ForeignKey(Reg, models.DO_NOTHING)
+    cat = models.ForeignKey(Cat, models.DO_NOTHING)
     name = models.TextField()
     phone = models.CharField(max_length=255)
-    description = models.TextField()
+    description = models.CharField(max_length=255)
     location = models.TextField()
-    photo = models.TextField(blank=True, null=True)
-    user_type = models.CharField(max_length=255)
-
-    status = models.BooleanField()
+    photo = models.CharField(max_length=255)
+    user_type = models.BooleanField(max_length=255,default=False)
+    status = models.BooleanField(default=True)
     user_shared = models.IntegerField()
     user_viewed = models.IntegerField()
     user_called = models.IntegerField()
     user_total_post = models.IntegerField()
-    user_logged_date = models.DateTimeField(blank=True, null=True)
-    call_status = models.CharField(max_length=10, blank=True, null=True)
-    nid = models.TextField()
-    tin = models.TextField()
-    self_referral_id = models.CharField(max_length=8)
-    reg_referral_id = models.CharField(max_length=8)
-    email = models.CharField(max_length=255)
-    is_active = models.IntegerField()
-    deactivated_at = models.DateTimeField(blank=True, null=True)
+    user_logged_date = models.DateTimeField()
 
     class Meta:
         managed = False
@@ -454,9 +309,7 @@ class ViewList(models.Model):
     view_time = models.DateTimeField()
     view_user_id = models.IntegerField()
     user_id = models.IntegerField()
-    view_count = models.BigIntegerField()
 
     class Meta:
         managed = False
         db_table = 'view_list'
-        unique_together = (('view_user_id', 'user_id'),)

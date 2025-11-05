@@ -3,11 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:html' as html; // Import for HTML operations
 import 'dart:typed_data';
-<<<<<<< HEAD
 import "package:flutter_web_dashboard/config.dart";
-=======
-import'package:flutter_web_dashboard/config.dart';
->>>>>>> 6c736d0932110085b7e83a0d2968fbbc51a94ad9
 
 class InsertPage extends StatefulWidget {
   const InsertPage({Key? key}) : super(key: key);

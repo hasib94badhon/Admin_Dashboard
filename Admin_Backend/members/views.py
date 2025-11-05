@@ -300,7 +300,8 @@ def apps_links_excel(request):
                     web=web,
                     category=category,
                     photo=photo,
-                    address=address
+                    address=address,
+                    visit_count=0
                 )
 
         fs.delete(filename)
@@ -376,7 +377,8 @@ def fb_page_excel(request):
                     cat = category,
                     phone = phone,
                     location = address,
-                    link = web
+                    link = web,
+                    visit_count = 0
 
                 )
 
@@ -431,161 +433,193 @@ def user_toggle_status(request, pk):
         }, status=200)
     return JsonResponse({"error": "Invalid request method."}, status=400)
 
+# @csrf_exempt
+# def user_type_toggle_status(request, pk):
+   
+#     if request.method == "POST":
+#         user = get_object_or_404(Users, pk=pk)
+       
+#         user.user_type = not user.user_type
+#         user.save()
+#         return JsonResponse({
+#             "success": True,
+#             "message": "User type updated successfully.",
+#             "id": user.user_id,
+#             "name": user.name,
+#             "status": user.user_type
+#         }, status=200)
+#     return JsonResponse({"error": "Invalid request method."}, status=400)
+
 @csrf_exempt
 def user_type_toggle_status(request, pk):
-   
     if request.method == "POST":
         user = get_object_or_404(Users, pk=pk)
-        # Toggle status (1 becomes 0 and 0 becomes 1)
-        user.user_type = not user.user_type
-        user.save()
+
+        # Toggle between 'PAID' and 'FREE'
+        if user.user_type and user.user_type.upper() == "PAID":
+            user.user_type = "FREE"
+        else:
+            user.user_type = "PAID"
+
+        user.save(update_fields=["user_type"])
+
         return JsonResponse({
             "success": True,
             "message": "User type updated successfully.",
             "id": user.user_id,
             "name": user.name,
-            "status": user.user_type
+            # Send boolean to Flutter (True = PAID, False = FREE)
+            "user_type": True if user.user_type == "PAID" else False
         }, status=200)
+
     return JsonResponse({"error": "Invalid request method."}, status=400)
 
+
+
+# def get_users(request):
+#     """
+#     API to fetch, search, and sort Users data based on different criteria.
+#     Query parameters:
+#         - sort: Defines the sorting method ('recent', 'category', 'user_type', 'user_called').
+#         - category: (Optional) Filter users by a specific category ID.
+#         - user_type: (Optional) Filter by user_type ('free' or 'paid').
+#         - search: (Optional) Search for a user by user_id. Returns specific user data if provided.
+#     """
+#     if request.method == 'GET':
+#         sort_by = request.GET.get('sort', 'recent')
+#         category = request.GET.get('category', None)
+#         user_type = request.GET.get('user_type', None)
+#         search = request.GET.get('search', None)  # Search by user_id
+#         user_id = request.GET.get('search', None)
+#         download = request.GET.get('download', None) 
+
+#         users = Users.objects.all()
+#         cats = Cat.objects.all()
+#         print(type(cats))
+
+
+#         if search:
+#             users = users.filter(user_id=search)
+
+#         # Filter by category
+#         if category:
+#             users = users.filter(cat_id=category)
+
+#         # Filter by user_type
+#         if user_type:
+#             users = users.filter(user_type=user_type)
+        
+#          #Query users
+#         if user_id:  # Fetch a specific user
+#             users = Users.objects.filter(user_id=user_id)
+            
+#             if not users.exists():
+#                 return JsonResponse({'error': 'User not found'}, status=404)
+#         else:  # Fetch all users
+#             users = Users.objects.all()
+        
+#         user_data = list(users.select_related('cat_id').values(
+#         'user_id', 'name', 'phone', 'description', 'location', 'photo',
+#         'user_type', 'status', 'user_shared', 'user_viewed', 'user_called',
+#         'user_total_post', 'user_logged_date', 'cat_id',
+#         'cat__cat_name'  # <-- Fetch cat_name from related Cat model
+#         ))
+
+#         for u in user_data:
+#             if isinstance(u['user_type'], str):
+#                 u['user_type'] = True if u['user_type'].lower() == 'paid' else False
+       
+#         # Sort by criteria
+#         if sort_by == 'recent':
+#             users = users.order_by('-user_logged_date')  # Most recent
+#         elif sort_by == 'category':
+#             users = users.order_by('cat_id')  # Sorted by category ID
+#         elif sort_by == 'paid':
+#             users = users.filter(user_type__iexact='PAID')
+#         elif sort_by == 'free':
+#             users = users.filter(user_type__iexact='FREE')
+#         elif sort_by == 'user_called':
+#             users = users.order_by('-user_called')  # Highest to lowest calls
+#         else:
+#             return JsonResponse({'error': 'Invalid sort parameter'}, status=400)
+
+#         # Format response for multiple users
+       
+#         user_data = list(users.select_related('cat').values(
+#                 'user_id', 'name', 'phone', 'description', 'location', 'photo',
+#                 'user_type', 'status', 'user_shared', 'user_viewed', 'user_called',
+#                 'user_total_post', 'user_logged_date', 'cat_id',
+#                 'cat_id__cat_name'  # <-- Fetch cat_name from related Cat model
+#             ))
+        
+        
+
+#         return JsonResponse({'users': user_data}, status=200, safe=False)
+
+#     return JsonResponse({'error': 'Invalid request method'}, status=405)
 
 
 def get_users(request):
     """
     API to fetch, search, and sort Users data based on different criteria.
     Query parameters:
-        - sort: Defines the sorting method ('recent', 'category', 'user_type', 'user_called').
+        - sort: Defines the sorting method ('recent', 'category', 'paid', 'free', 'user_called').
         - category: (Optional) Filter users by a specific category ID.
-        - user_type: (Optional) Filter by user_type ('free' or 'paid').
-        - search: (Optional) Search for a user by user_id. Returns specific user data if provided.
+        - user_type: (Optional) Filter by user_type ('PAID' or 'FREE').
+        - search: (Optional) Search for a user by user_id.
     """
     if request.method == 'GET':
         sort_by = request.GET.get('sort', 'recent')
         category = request.GET.get('category', None)
         user_type = request.GET.get('user_type', None)
-        search = request.GET.get('search', None)  # Search by user_id
-        user_id = request.GET.get('search', None)
-        download = request.GET.get('download', None) 
+        search = request.GET.get('search', None)
 
         users = Users.objects.all()
-        cats = Cat.objects.all()
-        print(type(cats))
 
-
+        # Search by user_id
         if search:
             users = users.filter(user_id=search)
+            if not users.exists():
+                return JsonResponse({'error': 'User not found'}, status=404)
 
         # Filter by category
         if category:
             users = users.filter(cat_id=category)
 
-        # Filter by user_type
+        # Filter by user_type (capital string in DB)
         if user_type:
-            users = users.filter(user_type=user_type)
-        
-         #Query users
-        if user_id:  # Fetch a specific user
-            users = Users.objects.filter(user_id=user_id)
-            
-            if not users.exists():
-                return JsonResponse({'error': 'User not found'}, status=404)
-        else:  # Fetch all users
-            users = Users.objects.all()
-        
-        user_data = list(users.select_related('cat_id').values(
-        'user_id', 'name', 'phone', 'description', 'location', 'photo',
-        'user_type', 'status', 'user_shared', 'user_viewed', 'user_called',
-        'user_total_post', 'user_logged_date', 'cat_id',
-        'cat_id__cat_name'  # <-- Fetch cat_name from related Cat model
-    ))
-       
-        
-        
-            
-        
-        
+            users = users.filter(user_type__iexact=user_type.upper())
 
-        # if download:  # Generate a PDF if the 'download' parameter is set
-        #     # Render data in HTML template for PDF
-        #     if user_id:
-        #         if user_id:  # Fetch specific user based on user_id
-        #             try:
-        #                 user = Users.objects.get(user_id=user_id)  # Fetch a specific user
-        #             except Users.DoesNotExist:
-        #                 return JsonResponse({'error': 'User not found'}, status=404)
-                    
-        #             # Convert user to a dictionary to pass into the template
-        #             user_data = {
-        #                 'user_id': user.user_id,
-        #                 'name': user.name,
-        #                 'phone': user.phone,
-        #                 'user_type': user.user_type,
-        #                 'status': user.status,
-        #                 'location': user.location,
-        #                 'user_total_post': user.user_total_post,
-        #                 'user_logged_date': user.user_logged_date,
-        #             }
-        #         # Only one user if filtering by user_id
-        #         data = user_data
-        #         user_name = data['name'].replace(" ", "_")  # To safely use in the filename
-        #         filename = f"{user_name}.pdf"  # Dynamic filename based on user name
-        #     else:
-        #         filename = "user_data.pdf"
-            
-        #     template_path = os.path.join(os.getcwd(), "templates", "user_template.html")
-        #     if not os.path.exists(template_path):
-        #         raise FileNotFoundError("HTML template not found at {}".format(template_path))
-
-        #     html_content = render_to_string('user_template.html', {'users': data})
-            
-        #     # Create a temporary PDF file
-        #     pdf_file = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
-        #     HTML(string=html_content).write_pdf(pdf_file.name)
-
-        #     # Read the temporary file content and return it as a response
-        #     with open(pdf_file.name, 'rb') as f:
-        #         pdf_content = f.read()
-
-        #     # Delete the temporary file after use
-        #     pdf_file.close()
-
-        #     # Return the file as a downloadable attachment
-        #     # Return the PDF file as response for download with specific filename
-        #     response = HttpResponse(pdf_content, content_type='application/pdf')
-        #     response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        #     return response
-       
-
-        # Sort by criteria
+        # Sorting
         if sort_by == 'recent':
-            users = users.order_by('-user_logged_date')  # Most recent
+            users = users.order_by('-user_logged_date')
         elif sort_by == 'category':
-            users = users.order_by('cat_id')  # Sorted by category ID
+            users = users.order_by('cat_id')
         elif sort_by == 'paid':
-            users = users.filter(user_type=True)
+            users = users.filter(user_type__iexact='PAID')
         elif sort_by == 'free':
-            users = users.filter(user_type=False)  # Sorted by user type
+            users = users.filter(user_type__iexact='FREE')
         elif sort_by == 'user_called':
-            users = users.order_by('-user_called')  # Highest to lowest calls
+            users = users.order_by('-user_called')
         else:
             return JsonResponse({'error': 'Invalid sort parameter'}, status=400)
 
-        # Format response for multiple users
-       
-        user_data = list(users.select_related('cat_id').values(
-                'user_id', 'name', 'phone', 'description', 'location', 'photo',
-                'user_type', 'status', 'user_shared', 'user_viewed', 'user_called',
-                'user_total_post', 'user_logged_date', 'cat_id',
-                'cat_id__cat_name'  # <-- Fetch cat_name from related Cat model
-            ))
-        
-        
+        # Prepare response data
+        user_data = list(users.select_related('cat').values(
+            'user_id', 'name', 'phone', 'description', 'location', 'photo',
+            'user_type', 'status', 'user_shared', 'user_viewed', 'user_called',
+            'user_total_post', 'user_logged_date', 'cat_id',
+            'cat__cat_name'
+        ))
+
+        # Convert PAID/FREE -> boolean for Flutter
+        for u in user_data:
+            if isinstance(u['user_type'], str):
+                u['user_type'] = True if u['user_type'].upper() == 'PAID' else False
 
         return JsonResponse({'users': user_data}, status=200, safe=False)
 
     return JsonResponse({'error': 'Invalid request method'}, status=405)
-
-
 
 
 def download_user(request):
