@@ -7,39 +7,58 @@ import 'package:flutter_web_dashboard/layout.dart';
 import 'package:flutter_web_dashboard/pages/404/error.dart';
 import 'package:flutter_web_dashboard/pages/authentication/authentication.dart';
 import 'package:get/get.dart';
+import 'package:get_storage/get_storage.dart';
 import 'package:google_fonts/google_fonts.dart';
-
 import 'routing/routes.dart';
 
-void main() {
-  Get.put(menu_controller.MenuController());
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  Get.put(NavigationController());
+  await GetStorage.init();
+
+  Get.put(menu_controller.MenuController());
+  Get.put(NavigationController()); // ✅ register here
+
   runApp(const MyApp());
 }
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
-  // This widget is the root of your application.
   @override
   Widget build(BuildContext context) {
+    final storage = GetStorage();
+    final isLoggedIn = storage.read('isLoggedIn') ?? false;
     return GetMaterialApp(
-      initialRoute: rootRoute,
-      unknownRoute: GetPage(
-          name: '/not-found',
-          page: () => const PageNotFound(),
-          transition: Transition.fadeIn),
+      // 1) Start on authentication
+      initialRoute: isLoggedIn ? rootRoute : authenticationPageRoute,
+
+      // 2) Define all pages
       getPages: [
         GetPage(
-            name: rootRoute,
-            page: () {
-              return SiteLayout();
-            }),
+          name: authenticationPageRoute,
+          page: () => const AuthenticationPage(),
+          transition: Transition.fadeIn,
+        ),
         GetPage(
-            name: authenticationPageRoute,
-            page: () => const AuthenticationPage()),
+          name: rootRoute, // "/" → SiteLayout (dashboard shell)
+          page: () => SiteLayout(),
+          transition: Transition.fadeIn,
+        ),
+        // Optional: map overview route if you also navigate by name directly
+        // GetPage(
+        //   name: overviewPageRoute,
+        //   page: () => const OverviewPage(),
+        // ),
       ],
+
+      // 3) Fallback for unknown routes
+      unknownRoute: GetPage(
+        name: '/not-found',
+        page: () => const PageNotFound(),
+        transition: Transition.fadeIn,
+      ),
+
+      // 4) Theme
       debugShowCheckedModeBanner: false,
       title: 'Dashboard',
       theme: ThemeData(
@@ -52,7 +71,10 @@ class MyApp extends StatelessWidget {
         }),
         primarySwatch: Colors.blue,
       ),
-      // home: AuthenticationPage(),
+
+      // 5) Do NOT provide a navigatorKey here.
+      //    Your local content Navigator inside SiteLayout should own its own key.
+      // navigatorKey: NavigationController.instance.navigatorKey, // ❌ remove
     );
   }
 }

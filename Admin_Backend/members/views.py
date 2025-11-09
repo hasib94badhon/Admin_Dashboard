@@ -20,6 +20,43 @@ from django.shortcuts import get_object_or_404
 from weasyprint import HTML
 import tempfile
 from unicodedata import normalize
+from django.contrib.auth import authenticate
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from django.utils import timezone
+from django.db.models import Count
+from datetime import timedelta
+from django.utils.timezone import now,localdate
+from django.db.models.functions import TruncDate,TruncMonth
+from datetime import datetime, timedelta, timezone
+from django.db import connection
+
+
+@api_view(['POST'])
+def login_superuser(request):
+    username = request.data.get('username')
+    password = request.data.get('password')
+
+    user = authenticate(username=username, password=password)
+
+    if user is not None and user.is_superuser:
+        return Response({
+            'success': True,
+            'message': 'Login successful',
+            'user': {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'is_superuser': user.is_superuser,
+                'is_staff': user.is_staff,
+            }
+        })
+    else:
+        return Response({
+            'success': False,
+            'message': 'Invalid credentials or not a superuser'
+        })
+
 
 
 # def data_view(request):
@@ -679,3 +716,72 @@ def download_user(request):
             return JsonResponse({'error': f'Error generating PDF: {str(e)}'}, status=500)
 
     return JsonResponse({'error': 'Invalid request method'}, status=405)
+
+
+
+
+
+@api_view(['GET'])
+def dashboard_stats(request):
+    today_start = datetime.combine(now().date(), datetime.min.time()).replace(tzinfo=timezone.utc)
+    today_end = datetime.combine(now().date(), datetime.max.time()).replace(tzinfo=timezone.utc)
+
+    last7_start = today_start - timedelta(days=7)
+    last30_start = today_start - timedelta(days=30)
+
+    # Registrations grouped by day (last 30 days) – ORM version (তুমি চাইলে বাদ দিতে পারো)
+    reg_counts = (
+        Reg.objects.filter(created_date__range=(last30_start, today_end))
+        .extra(select={'day': "DATE(created_date)"})
+        .values('day')
+        .annotate(count=Count('reg_id'))
+        .order_by('day')
+    )
+    reg_counts_day = (
+    Reg.objects
+    .annotate(day=TruncDate('created_date', tzinfo=None))  # timezone conversion বন্ধ
+    .values('day')
+    .annotate(count=Count('reg_id'))
+    .order_by('-day')
+)
+    registrations_day = [
+    {"day": row["day"].isoformat(), "count": row["count"]}
+    for row in reg_counts_day
+]
+
+    # Month-wise registrations 
+    reg_counts_month = (
+        Reg.objects
+        .annotate(month=TruncMonth('created_date', tzinfo=None))  # timezone conversion বন্ধ
+        .values('month')
+        .annotate(count=Count('reg_id'))
+        .order_by('-month')
+    )
+    
+    registrations_month = [
+    {"month": row["month"].strftime("%Y-%m"), "count": row["count"]}
+    for row in reg_counts_month
+]
+
+
+    # Posts today and last 7/30 days
+    today_posts = Post.objects.filter(post_time__range=(today_start, today_end)).count()
+    last7_posts = Post.objects.filter(post_time__gte=last7_start).count()
+    last30_posts = Post.objects.filter(post_time__gte=last30_start).count()
+
+    # User logins today, last 7/30 days
+    today_logins = Users.objects.filter(user_logged_date__range=(today_start, today_end)).count()
+    last7_logins = Users.objects.filter(user_logged_date__gte=last7_start).count()
+    last30_logins = Users.objects.filter(user_logged_date__gte=last30_start).count()
+
+    return Response({
+        "registrations": list(reg_counts),      # ORM last30 days
+        "registrations_day": registrations_day,           # Raw SQL all days
+        "registrations_month": registrations_month,       # Raw SQL all months
+        "today_posts": today_posts,
+        "last7_posts": last7_posts,
+        "last30_posts": last30_posts,
+        "today_logins": today_logins,
+        "last7_logins": last7_logins,
+        "last30_logins": last30_logins,
+    })

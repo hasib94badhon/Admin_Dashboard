@@ -50,6 +50,8 @@ dependencies:
   
   auth0_flutter: ^1.7.2
   path_provider: ^2.1.5
+  get_storage: ^2.1.1
+  universal_html: ^2.2.4
 
 dev_dependencies:
   flutter_test:

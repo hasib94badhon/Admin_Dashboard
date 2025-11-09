@@ -18,5 +18,7 @@ urlpatterns = [
     path('user-type-toggle-status/<int:pk>/', user_type_toggle_status, name='user_type_toggle_status'),
     path('get-users/', get_users, name='get_users'),
     path('download-user/', download_user, name='download_user'),
+    path('api/login-superuser/', login_superuser),
+    path('api/dashboard-stats/', dashboard_stats, name='dashboard_stats'),
     
 ]

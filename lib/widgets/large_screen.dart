@@ -11,13 +11,14 @@ class LargeScreen extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Expanded(child: SideMenu()),
-        Expanded(
+        Flexible(
+          // ✅ use Flexible instead of Expanded
           flex: 5,
           child: Container(
             margin: const EdgeInsets.symmetric(horizontal: 16),
-            child: localNavigator(),
+            child: localNavigator(), // must use stable navigatorKey inside
           ),
-        )
+        ),
       ],
     );
   }

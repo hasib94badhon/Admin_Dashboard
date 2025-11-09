@@ -46,11 +46,13 @@ app.*.map.json
 
 
 # Virtual environments
+myworld/ 
 backendworld/
 myworld/
 ENV/
 .myenv/
 .venv/
+
 
 # Django specific   
 *.sqlite3

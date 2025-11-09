@@ -1,14 +1,18 @@
 import 'package:flutter/cupertino.dart';
 import 'package:get/get.dart';
 
-class NavigationController extends GetxController{
-  static NavigationController instance = Get.find();
-  final GlobalKey<NavigatorState> navigatorKey = GlobalKey();
+class NavigationController extends GetxController {
+  static NavigationController get instance => Get.find<NavigationController>();
 
-  Future<dynamic> navigateTo(String routeName){
+  final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+  Future<dynamic> navigateTo(String routeName) {
     return navigatorKey.currentState!.pushNamed(routeName);
   }
 
-  goBack() => navigatorKey.currentState?.pop();
+  void replaceTo(String routeName) {
+    navigatorKey.currentState!.pushReplacementNamed(routeName);
+  }
 
+  void goBack() => navigatorKey.currentState?.pop();
 }

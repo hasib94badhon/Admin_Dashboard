@@ -33,6 +33,20 @@ class MenuController extends GetxController {
         return _customIcon(Icons.import_export, itemName);
       case AppstatusPageDisplayName:
         return _customIcon(Icons.stacked_line_chart_rounded, itemName);
+      case staffAdminPageDisplayName:
+        return _customIcon(Icons.admin_panel_settings, itemName);
+      case subscriberPageDisplayName:
+        return _customIcon(Icons.subscriptions, itemName);
+      case referralPageDisplayName:
+        return _customIcon(Icons.group_add, itemName);
+      case deactivationPageDisplayName:
+        return _customIcon(Icons.person_off, itemName);
+      case servicePageDisplayName:
+        return _customIcon(Icons.miscellaneous_services, itemName);
+      case shopPageDisplayName:
+        return _customIcon(Icons.storefront, itemName);
+      case locationPageDisplayName:
+        return _customIcon(Icons.location_on, itemName);
       case authenticationPageDisplayName:
         return _customIcon(Icons.exit_to_app, itemName);
       default:
