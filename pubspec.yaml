@@ -52,6 +52,7 @@ dependencies:
   path_provider: ^2.1.5
   get_storage: ^2.1.1
   universal_html: ^2.2.4
+  fl_chart: ^0.71.0
 
 dev_dependencies:
   flutter_test:

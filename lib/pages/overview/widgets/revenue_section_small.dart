@@ -35,8 +35,8 @@ class _RevenueSectionSmallState extends State<RevenueSectionSmall> {
     }
 
     return Container(
-      padding: const EdgeInsets.all(24),
-      margin: const EdgeInsets.symmetric(vertical: 30),
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(vertical: 20),
       decoration: BoxDecoration(
         color: Colors.red[100],
         borderRadius: BorderRadius.circular(20),
@@ -48,70 +48,92 @@ class _RevenueSectionSmallState extends State<RevenueSectionSmall> {
         ],
         border: Border.all(color: lightGrey, width: .5),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Expanded(
+          // Chart Section
+          SizedBox(
+            height: 400, // Fixed height
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 const CustomText(
                   text: "User Registration Graph",
-                  size: 20,
+                  size: 18,
                   weight: FontWeight.bold,
                   color: lightGrey,
                 ),
-                SizedBox(
-                  width: 600,
-                  height: 200,
+                const SizedBox(height: 16),
+                Expanded(
                   child: RegistrationChart(),
                 ),
               ],
             ),
           ),
-          Container(
-            width: 1,
-            height: 120,
-            color: lightGrey,
-          ),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                Row(
-                  children: [
-                    RevenueInfo(
-                      title: "Today Posts",
-                      amount: stats!['today_posts'].toString(),
-                    ),
-                    RevenueInfo(
-                      title: "Last 7 days",
-                      amount: stats!['last7_posts'].toString(),
-                    ),
-                    RevenueInfo(
-                      title: "Last 30 days",
-                      amount: stats!['last30_posts'].toString(),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 30),
-                Row(
-                  children: [
-                    RevenueInfo(
-                      title: "Today Login",
-                      amount: stats!['today_logins'].toString(),
-                    ),
-                    RevenueInfo(
-                      title: "Last 7 days",
-                      amount: stats!['last7_logins'].toString(),
-                    ),
-                    RevenueInfo(
-                      title: "Last 30 days",
-                      amount: stats!['last30_logins'].toString(),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+
+          const SizedBox(height: 20),
+          const Divider(color: lightGrey),
+          const SizedBox(height: 20),
+
+          // Statistics Section
+          Column(
+            children: [
+              Column(
+                children: [
+                  const CustomText(
+                    text: "Posts Statistics",
+                    size: 16,
+                    weight: FontWeight.bold,
+                    color: lightGrey,
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      RevenueInfo(
+                        title: "Today",
+                        amount: stats!['today_posts'].toString(),
+                      ),
+                      RevenueInfo(
+                        title: "Last 7 days",
+                        amount: stats!['last7_posts'].toString(),
+                      ),
+                      RevenueInfo(
+                        title: "Last 30 days",
+                        amount: stats!['last30_posts'].toString(),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Column(
+                children: [
+                  const CustomText(
+                    text: "Login Statistics",
+                    size: 16,
+                    weight: FontWeight.bold,
+                    color: lightGrey,
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      RevenueInfo(
+                        title: "Today",
+                        amount: stats!['today_logins'].toString(),
+                      ),
+                      RevenueInfo(
+                        title: "Last 7 days",
+                        amount: stats!['last7_logins'].toString(),
+                      ),
+                      RevenueInfo(
+                        title: "Last 30 days",
+                        amount: stats!['last30_logins'].toString(),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
           ),
         ],
       ),

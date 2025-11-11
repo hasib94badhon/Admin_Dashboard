@@ -15,43 +15,43 @@ class OverviewPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Obx(
-          () => Row(
-            children: [
-              Container(
-                  color: Colors.red[100],
-                  margin: EdgeInsets.only(
-                      top: ResponsiveWidget.isSmallScreen(context) ? 56 : 6),
-                  child: CustomText(
-                    text: menuController.activeItem.value,
-                    size: 24,
-                    weight: FontWeight.bold,
-                  )),
-            ],
-          ),
-        ),
-        Expanded(
-          child: ListView(
-            children: [
-              if (ResponsiveWidget.isLargeScreen(context) ||
-                  ResponsiveWidget.isMediumScreen(context))
-                if (ResponsiveWidget.isCustomSize(context))
-                  const OverviewCardsMediumScreen()
-                else
-                  const OverviewCardsLargeScreen()
+    return Scaffold(
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            Obx(
+              () => Row(
+                children: [
+                  Container(
+                      color: Colors.red[100],
+                      margin: EdgeInsets.only(
+                          top:
+                              ResponsiveWidget.isSmallScreen(context) ? 56 : 6),
+                      child: CustomText(
+                        text: menuController.activeItem.value,
+                        size: 24,
+                        weight: FontWeight.bold,
+                      )),
+                ],
+              ),
+            ),
+            // Remove Expanded and ListView, use direct widgets
+            if (ResponsiveWidget.isLargeScreen(context) ||
+                ResponsiveWidget.isMediumScreen(context))
+              if (ResponsiveWidget.isCustomSize(context))
+                const OverviewCardsMediumScreen()
               else
-                const OverviewCardsSmallScreen(),
-              if (!ResponsiveWidget.isSmallScreen(context))
-                RevenueSectionLarge()
-              else
-                RevenueSectionSmall(),
-              const AvailableDriversTable(),
-            ],
-          ),
+                const OverviewCardsLargeScreen()
+            else
+              const OverviewCardsSmallScreen(),
+            if (!ResponsiveWidget.isSmallScreen(context))
+              const RevenueSectionLarge()
+            else
+              const RevenueSectionSmall(),
+            const AvailableDriversTable(),
+          ],
         ),
-      ],
+      ),
     );
   }
 }
