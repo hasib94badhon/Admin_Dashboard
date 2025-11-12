@@ -20,5 +20,6 @@ urlpatterns = [
     path('download-user/', download_user, name='download_user'),
     path('api/login-superuser/', login_superuser),
     path('api/dashboard-stats/', dashboard_stats, name='dashboard_stats'),
+    path('api/deactivated-users/', deactivated_users, name='deactivated_users'),
     
 ]

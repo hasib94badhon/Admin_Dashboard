@@ -2,7 +2,7 @@ import 'dart:math';
 import 'package:charts_flutter_new/flutter.dart' as charts;
 import 'package:flutter/material.dart';
 import 'package:flutter_web_dashboard/constants/style.dart';
-import 'package:flutter_web_dashboard/service/dashboard_service.dart';
+import 'package:flutter_web_dashboard/service_api/api_service.dart';
 
 class RegistrationChart extends StatefulWidget {
   const RegistrationChart({super.key});

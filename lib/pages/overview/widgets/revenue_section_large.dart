@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_web_dashboard/constants/style.dart';
 import 'package:flutter_web_dashboard/pages/overview/widgets/bar_chart.dart';
 import 'package:flutter_web_dashboard/pages/overview/widgets/revenue_info.dart';
-import 'package:flutter_web_dashboard/service/dashboard_service.dart';
+import 'package:flutter_web_dashboard/service_api/api_service.dart';
 import 'package:flutter_web_dashboard/widgets/custom_text.dart';
 
 class RevenueSectionLarge extends StatefulWidget {

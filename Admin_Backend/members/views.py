@@ -24,12 +24,12 @@ from django.contrib.auth import authenticate
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.utils import timezone
-from django.db.models import Count
+from django.db.models import Count,Q, F, OuterRef, Subquery, IntegerField, Value
 from datetime import timedelta
 from django.utils.timezone import now,localdate
-from django.db.models.functions import TruncDate,TruncMonth
+from django.db.models.functions import TruncDate,TruncMonth,Coalesce
 from datetime import datetime, timedelta, timezone
-from django.db import connection
+
 
 
 @api_view(['POST'])
@@ -785,3 +785,96 @@ def dashboard_stats(request):
         "last7_logins": last7_logins,
         "last30_logins": last30_logins,
     })
+
+
+
+def deactivated_users(request):
+    """
+    GET /api/deactivated-users/?sort=most_recent|most_called|most_viewed
+       &user_id=123
+       &service_id=456
+       &name=partial
+       &mobile=017...
+    Returns JSON: { total: int, results: [ ... ] }
+    """
+
+    # শুধুমাত্র যাদের deactivated_at NOT NULL
+    qs = Users.objects.filter(deactivated_at__isnull=False)
+
+    # সর্বশেষ deactivation reason/time আনতে Subquery
+    deact_qs = UserDeactivations.objects.filter(
+        user_id=OuterRef('user_id'),
+        deactivated_at=OuterRef('deactivated_at')  # 👈 match করতে হবে users.deactivated_at এর সাথে
+    ).order_by('-deactivated_at')
+
+    # Search filters
+    user_id = request.GET.get('user_id')
+    service_id_param = request.GET.get('service_id')
+    name = request.GET.get('name')
+    mobile = request.GET.get('mobile')
+
+    if user_id:
+        qs = qs.filter(user_id=user_id)
+    if name:
+        qs = qs.filter(name__icontains=name)
+    if mobile:
+        qs = qs.filter(phone__icontains=mobile)
+
+    # Category name
+    cat_name_sq = Cat.objects.filter(pk=OuterRef('cat_id')).values('cat_name')[:1]
+
+    # Service/shop IDs
+    service_sq = Service.objects.filter(user_id=OuterRef('user_id')).values('service_id')[:1]
+    shop_sq = Shop.objects.filter(user_id=OuterRef('user_id')).values('shop_id')[:1]
+
+    qs = qs.annotate(
+        deactivation_reason=Subquery(deact_qs.values('reason')[:1]),
+        deactivation_time=Subquery(deact_qs.values('deactivated_at')[:1]),
+        cat_name=Subquery(cat_name_sq),
+        service_id_annotated=Coalesce(Subquery(service_sq, output_field=IntegerField()), Value(0)),
+        shop_id_annotated=Coalesce(Subquery(shop_sq, output_field=IntegerField()), Value(0)),
+    )
+
+    # Sorting
+    sort = request.GET.get('sort', 'most_recent')
+    if sort == 'most_called':
+        qs = qs.order_by(F('user_called').desc(nulls_last=True))
+    elif sort == 'most_viewed':
+        qs = qs.order_by(F('user_viewed').desc(nulls_last=True))
+    else:
+        qs = qs.order_by(F('deactivation_time').desc(nulls_last=True))
+
+    total = qs.count()
+
+    results = []
+    for u in qs[:200]:
+        if u.cat_id == 56:
+            service_id_val = 0
+            shop_id_val = 0
+        else:
+            service_id_val = getattr(u, 'service_id_annotated', 0) or 0
+            shop_id_val = getattr(u, 'shop_id_annotated', 0) or 0
+
+        user_type = 'paid' if u.is_active else 'unpaid'
+
+        results.append({
+            'user_id': u.user_id,
+            'name': u.name,
+            'phone': u.phone,
+            'email': u.email,
+            'category_name': getattr(u, 'cat_name', '') or '',
+            'user_type': user_type,
+            'status': bool(u.status),
+            'is_active': bool(u.is_active),
+            'call_status': u.call_status or '',
+            'user_called': u.user_called,
+            'user_viewed': u.user_viewed,
+            'user_total_post': u.user_total_post,
+            'deactivated_at': u.deactivated_at,  # 👈 users table থেকে
+            'deactivation_reason': getattr(u, 'deactivation_reason', '') or '',
+            'service_id': service_id_val,
+            'shop_id': shop_id_val,
+        })
+
+    return JsonResponse({'total': total, 'results': results}, safe=False)
+

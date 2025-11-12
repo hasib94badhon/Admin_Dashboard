@@ -1,3 +1,5 @@
+import 'package:intl/intl.dart';
+
 final String host = 'http://127.0.0.1:8000';
 
 class NumberFormatter {
@@ -8,6 +10,21 @@ class NumberFormatter {
       return "${(value / 1000).toStringAsFixed(1)}k";
     } else {
       return value.toString();
+    }
+  }
+}
+
+class DateTimeFormatter {
+  static String formatBdTime(String isoString) {
+    try {
+      // BD time already stored (no need to convert toLocal)
+      final dt = DateTime.parse(isoString);
+
+      // Use 12-hour format with AM/PM
+      final formatter = DateFormat('dd MMM yyyy, hh:mm a');
+      return formatter.format(dt);
+    } catch (e) {
+      return isoString;
     }
   }
 }
