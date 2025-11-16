@@ -28,3 +28,17 @@ class DateTimeFormatter {
     }
   }
 }
+
+class TimeFormatter {
+  static String formatBdTime(String isoString) {
+    try {
+      // Parse + convert to local timezone (BD)
+      final dt = DateTime.parse(isoString).toLocal();
+      // 12-hour format + AM/PM
+      final formatter = DateFormat('dd MMM yyyy, hh:mm a');
+      return formatter.format(dt);
+    } catch (e) {
+      return isoString;
+    }
+  }
+}

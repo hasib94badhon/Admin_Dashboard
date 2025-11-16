@@ -24,11 +24,13 @@ from django.contrib.auth import authenticate
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.utils import timezone
-from django.db.models import Count,Q, F, OuterRef, Subquery, IntegerField, Value
-from datetime import timedelta
-from django.utils.timezone import now,localdate
+from django.db.models import Count,Q, F, OuterRef, Subquery, IntegerField, Value,Sum
+from datetime import timedelta, datetime
 from django.db.models.functions import TruncDate,TruncMonth,Coalesce
-from datetime import datetime, timedelta, timezone
+from rest_framework import status
+
+
+
 
 
 
@@ -878,3 +880,84 @@ def deactivated_users(request):
 
     return JsonResponse({'total': total, 'results': results}, safe=False)
 
+
+@api_view(['GET'])
+def referral_list(request):
+    sort = request.GET.get('sort', 'most_recent')
+    search_user_id = request.GET.get('user_id')
+    search_name = request.GET.get('name')
+    search_phone = request.GET.get('phone')
+    # search_mobile = request.GET.get('mobile')
+
+    qs = UserReferrals.objects.all()
+
+    # Search filter
+    if search_user_id:
+        qs = qs.filter(referrer_user_id=search_user_id)
+    if search_name:
+        qs = qs.filter(referrer_user_id__in=Users.objects.filter(name__icontains=search_name).values_list('user_id', flat=True))
+    if search_phone:
+        qs = qs.filter(referrer_user_id__in=Users.objects.filter(phone__icontains=search_phone).values_list('user_id', flat=True))
+    # if search_mobile:
+    #     qs = qs.filter(referred_user_id__in=Users.objects.filter(phone__icontains=search_mobile).values_list('user_id', flat=True))
+
+    # Sorting
+    if sort == 'most_recent':
+        qs = qs.order_by('-created_at')
+    elif sort == 'highest_points':
+        qs = qs.order_by('-points')
+    elif sort == 'paid':
+        qs = qs.filter(payment_status='paid').order_by('-created_at')
+    elif sort == 'unpaid':
+        qs = qs.filter(payment_status='unpaid').order_by('-created_at')
+
+    serializer = UserReferralSerializer(qs, many=True)
+
+    # Summary counts
+    summary = {
+        "total": qs.count(),
+        "verified": qs.filter(verification='verified').count(),
+        "unverified": qs.filter(verification='unverified').count(),
+        "waiting": qs.filter(verification='waiting').count(),
+        "paid": qs.filter(payment_status='paid').count(),
+        "unpaid": qs.filter(payment_status='unpaid').count(),
+    }
+
+    return Response({
+        "summary": summary,
+        "results": serializer.data
+    })
+
+@api_view(['PATCH'])
+def update_referral(request, pk):
+    try:
+        referral = UserReferrals.objects.get(pk=pk)
+    except UserReferrals.DoesNotExist:
+        return Response({"error": "Referral not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    verification = request.data.get("verification")
+    payment_status = request.data.get("payment_status")
+
+    # Verification update
+    if verification:
+        referral.verification = verification
+
+    # Payment update
+    if payment_status:
+        if payment_status == "paid":
+            referral.payment_status = "paid"
+            referral.paid_at = timezone.now()
+           
+        elif payment_status == "unpaid":
+            referral.payment_status = "unpaid"
+            referral.paid_at = None
+
+    referral.save()
+
+    return Response({
+        "message": "Referral updated successfully",
+        "id": referral.id,
+        "payment_status": referral.payment_status,
+        "paid_at": referral.paid_at,
+        "verification": referral.verification
+    })

@@ -408,9 +408,11 @@ class UserReferrals(models.Model):
     referred_user_id = models.IntegerField(unique=True)
     referred_cat_id = models.IntegerField()
     points = models.IntegerField()
-    payment_status = models.CharField(max_length=10)
+    payment_status = models.CharField(max_length=100)
     created_at = models.DateTimeField()
     verification = models.CharField(max_length=20)
+    paid_at = models.DateTimeField(null=True, blank=True)
+
 
     class Meta:
         managed = False
