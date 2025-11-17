@@ -23,6 +23,7 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
   final passwordController = TextEditingController();
   bool rememberMe = true;
   bool isLoading = false;
+  bool _obscurePassword = true;
 
   Future<void> loginAdmin() async {
     setState(() => isLoading = true);
@@ -120,14 +121,28 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
                 const SizedBox(height: 15),
                 TextField(
                   controller: passwordController,
-                  obscureText: true,
+                  obscureText: _obscurePassword,
                   decoration: InputDecoration(
                     labelText: "Password",
                     hintText: "••••••",
                     border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(20)),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        _obscurePassword
+                            ? Icons.visibility_off
+                            : Icons.visibility,
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          _obscurePassword = !_obscurePassword;
+                        });
+                      },
+                    ),
                   ),
                 ),
+
                 const SizedBox(height: 15),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -143,7 +158,7 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
                         const CustomText(text: "Remember Me"),
                       ],
                     ),
-                    const CustomText(text: "Forgot password?", color: active),
+                    // const CustomText(text: "Forgot password?", color: active),
                   ],
                 ),
                 const SizedBox(height: 15),
@@ -166,17 +181,17 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
                   ),
                 ),
                 const SizedBox(height: 15),
-                RichText(
-                  text: const TextSpan(
-                    children: [
-                      TextSpan(text: "Do not have admin credentials? "),
-                      TextSpan(
-                        text: "Request Credentials!",
-                        style: TextStyle(color: active),
-                      ),
-                    ],
-                  ),
-                ),
+                // RichText(
+                //   text: const TextSpan(
+                //     children: [
+                //       TextSpan(text: "Do not have admin credentials? "),
+                //       TextSpan(
+                //         text: "Request Credentials!",
+                //         style: TextStyle(color: active),
+                //       ),
+                //     ],
+                //   ),
+                // ),
               ],
             ),
           ),

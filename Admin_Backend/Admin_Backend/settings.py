@@ -19,11 +19,14 @@ SECRET_KEY = config('SECRET_KEY')
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:11297",  # Add the Flutter web app URL
-    "http://127.0.0.1:8080"
+    "http://127.0.0.1:8080",
+    "https://aarambd.com",
+    "https://control.aarambd.com",
+    "https://try.aarambd.com",
 ]
 
 # OR, if you want to allow all origins (not recommended for production):
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = False
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
@@ -32,9 +35,16 @@ CORS_ALLOW_ALL_ORIGINS = True
 SECRET_KEY = 'django-insecure-e!n^1x7#(_d3$4$$2yg3^sa)pw)$5u28lv5*1aw))b2e6sy8k1'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [ 
+    "control.aarambd.com", 
+    "127.0.0.1", 
+    "localhost",
+    "31.97.226.162",
+    "https://aarambd.com",
+    "https://try.aarambd.com"
+]
 
 
 # Application definition
@@ -147,7 +157,8 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
