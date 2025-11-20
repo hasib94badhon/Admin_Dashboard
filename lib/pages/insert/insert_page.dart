@@ -62,7 +62,7 @@ class _InsertPageState extends State<InsertPage> {
       isUploading = true;
     });
 
-    final uri = Uri.parse("$host/upload-users/"); // API endpoint
+    final uri = Uri.parse("$host/api/upload-users/"); // API endpoint
     var request = http.MultipartRequest("POST", uri);
 
     // Add file data as bytes
@@ -108,7 +108,7 @@ class _InsertPageState extends State<InsertPage> {
       isUploading = true;
     });
 
-    final uri = Uri.parse("$host/upload-hotline-numbers/"); // API endpoint
+    final uri = Uri.parse("$host/api/upload-hotline-numbers/"); // API endpoint
     var request = http.MultipartRequest("POST", uri);
 
     // Add file data as bytes
@@ -154,7 +154,7 @@ class _InsertPageState extends State<InsertPage> {
       isUploading = true;
     });
 
-    final uri = Uri.parse("$host/upload-apps/"); // API endpoint
+    final uri = Uri.parse("$host/api/upload-apps/"); // API endpoint
     var request = http.MultipartRequest("POST", uri);
 
     // Add file data as bytes
@@ -225,7 +225,7 @@ class _InsertPageState extends State<InsertPage> {
     }
     bool isService = selectedtype == "service";
     bool isShop = selectedtype == "shop";
-    final uri = Uri.parse('$host/insert-cat/'); // API URL
+    final uri = Uri.parse('$host/api/insert-cat/'); // API URL
     var request = http.MultipartRequest('POST', uri)
       ..fields['cat_name'] = catNameController.text
       ..fields['yes_service'] = isService.toString()
@@ -258,46 +258,53 @@ class _InsertPageState extends State<InsertPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Insert"),
-        centerTitle: true,
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Select an option:",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            DropdownButton<String>(
-              isExpanded: true,
-              value: selectedOption,
-              items: ["User", "Category", "Hotline Numbers", "Apps", "FB Page"]
-                  .map((String value) {
-                return DropdownMenuItem<String>(
-                  value: value,
-                  child: Text(value),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  selectedOption = value;
-                });
-              },
-              hint: const Text("Choose an option"),
-            ),
-            const SizedBox(height: 20),
-            if (selectedOption == "User") _buildUserForm(),
-            if (selectedOption == "Category") _buildCategoryForm(),
-            if (selectedOption == "Hotline Numbers") _buildHotlineNumbersForm(),
-            if (selectedOption == "Apps") _buildAppsForm(),
-            // if (selectedOption == "FB Page") _buildfbForm(),
-          ],
+        appBar: AppBar(
+          title: const Text("Insert"),
+          centerTitle: true,
         ),
-      ),
-    );
+        body: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Select an option:",
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                DropdownButton<String>(
+                  isExpanded: true,
+                  value: selectedOption,
+                  items: [
+                    "User",
+                    "Category",
+                    "Hotline Numbers",
+                    "Apps",
+                    "FB Page"
+                  ].map((String value) {
+                    return DropdownMenuItem<String>(
+                      value: value,
+                      child: Text(value),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      selectedOption = value;
+                    });
+                  },
+                  hint: const Text("Choose an option"),
+                ),
+                const SizedBox(height: 20),
+                if (selectedOption == "User") _buildUserForm(),
+                if (selectedOption == "Category") _buildCategoryForm(),
+                if (selectedOption == "Hotline Numbers")
+                  _buildHotlineNumbersForm(),
+                if (selectedOption == "Apps") _buildAppsForm(),
+                // if (selectedOption == "FB Page") _buildfbForm(),
+              ],
+            ),
+          ),
+        ));
   }
 
   Widget _buildUserForm() {

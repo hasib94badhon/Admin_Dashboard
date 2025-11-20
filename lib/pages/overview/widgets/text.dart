@@ -55,7 +55,7 @@ class _InsertPageState extends State<InsertPage> {
       return;
     }
 
-    final uri = Uri.parse('$host/insert-cat/'); // API URL
+    final uri = Uri.parse('$host/api/insert-cat/'); // API URL
     var request = http.MultipartRequest('POST', uri)
       ..fields['cat_name'] = catNameController.text
       ..files.add(await http.MultipartFile.fromBytes(

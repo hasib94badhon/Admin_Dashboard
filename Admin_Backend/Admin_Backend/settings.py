@@ -38,7 +38,7 @@ SECRET_KEY = 'django-insecure-e!n^1x7#(_d3$4$$2yg3^sa)pw)$5u28lv5*1aw))b2e6sy8k1
 DEBUG = False
 
 ALLOWED_HOSTS = [ 
-    "control.aarambd.com", 
+    "https://control.aarambd.com", 
     "127.0.0.1", 
     "localhost",
     "31.97.226.162",

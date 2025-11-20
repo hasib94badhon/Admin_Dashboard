@@ -14,7 +14,7 @@ urlpatterns = [
     path('api/upload-apps/', apps_links_excel, name='upload-apps'),
     path('api/upload-fb_page/', fb_page_excel, name='upload-fb_page'),
     path('api/toggle-status/<int:pk>/', toggle_status, name='toggle_status'),
-    path('api/user-toggle-status/<int:pk>/', user_toggle_status, name='user_toggle_status'),
+    path('api/user_toggle_status/<int:pk>/', user_toggle_status, name='user_toggle_status'),
     path('api/user-type-toggle-status/<int:pk>/', user_type_toggle_status, name='user_type_toggle_status'),
     path('api/get-users/', get_users, name='get_users'),
     path('api/download-user/', download_user, name='download_user'),
@@ -25,5 +25,5 @@ urlpatterns = [
     path("api/referrals/<int:pk>/update/", update_referral)
 
 
-    
 ]
+

@@ -33,7 +33,7 @@ class _ClientstableState extends State<Clientstable> {
 
     try {
       // Base API URL
-      String apiUrl = '$host/get-users/';
+      String apiUrl = '$host/api/get-users/';
       if (userId != null && userId.isNotEmpty) {
         apiUrl += '?search=$userId';
       } else {
@@ -91,7 +91,7 @@ class _ClientstableState extends State<Clientstable> {
 
   Future<void> downloadUserData(BuildContext context, String? userId) async {
     try {
-      String apiUrl = '$host/download-user/?user_id=$userId';
+      String apiUrl = '$host/api/download-user/?user_id=$userId';
       final response = await http.get(Uri.parse(apiUrl));
 
       if (response.statusCode == 200) {
@@ -129,7 +129,7 @@ class _ClientstableState extends State<Clientstable> {
   }
 
   Future<void> usertoggleStatus(int userId) async {
-    final url = Uri.parse('$host/user-toggle-status/$userId/');
+    final url = Uri.parse('$host/api/user_toggle_status/$userId/');
 
     try {
       final response = await http.post(url);
@@ -145,7 +145,7 @@ class _ClientstableState extends State<Clientstable> {
   }
 
   Future<void> usertypetoggleStatus(int userId) async {
-    final url = Uri.parse('$host/user-type-toggle-status/$userId/');
+    final url = Uri.parse('$host/api/user-type-toggle-status/$userId/');
 
     try {
       final response = await http.post(url);

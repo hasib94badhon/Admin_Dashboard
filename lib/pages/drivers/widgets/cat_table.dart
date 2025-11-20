@@ -21,7 +21,7 @@ class _CatTableState extends State<CatTable> {
   }
 
   Future<void> toggleStatus(int categoryId) async {
-    final url = Uri.parse('$host/toggle-status/$categoryId/');
+    final url = Uri.parse('$host/api/toggle-status/$categoryId/');
 
     try {
       final response = await http.post(url);
@@ -88,7 +88,7 @@ class _CatTableState extends State<CatTable> {
                         CircleAvatar(
                           backgroundImage: NetworkImage(
                             Uri.encodeFull(
-                                'https://aarambd.com/cat logo/${cat['cat_logo']}'),
+                                'https://aarambd.com/cat%20logo/${cat['cat_logo']}'),
                           ),
                           radius: 20,
                           onBackgroundImageError: (exception, stackTrace) {

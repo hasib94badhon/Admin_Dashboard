@@ -15,21 +15,18 @@ from django.views.decorators.csrf import csrf_exempt
 from ftplib import FTP
 from django.core.files.storage import FileSystemStorage
 from openpyxl import load_workbook
-from datetime import datetime
 from django.shortcuts import get_object_or_404
 from weasyprint import HTML
 import tempfile
 from unicodedata import normalize
 from django.contrib.auth import authenticate
 from rest_framework.decorators import api_view
-from rest_framework.response import Response
 from django.utils import timezone
+from django.utils.timezone import now,localdate
 from django.db.models import Count,Q, F, OuterRef, Subquery, IntegerField, Value,Sum
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime,  timezone
 from django.db.models.functions import TruncDate,TruncMonth,Coalesce
 from rest_framework import status
-
-
 
 
 
@@ -431,46 +428,37 @@ def fb_page_excel(request):
         return JsonResponse({"error": str(e)}, status=500)
 
 
-@csrf_exempt
+@api_view(['POST'])
 def toggle_status(request, pk):
-    """
-    Toggle the status of a category.
-    :param request: The HTTP request object.
-    :param pk: The primary key of the category to toggle status.
-    """
-    if request.method == "POST":
-        category = get_object_or_404(Cat, pk=pk)
-        # Toggle status (1 becomes 0 and 0 becomes 1)
-        category.status = not category.status
-        category.save()
-
-        return JsonResponse({
-            "success": True,
-            "message": "Category status updated successfully.",
-            "id": category.cat_id,
-            "name": category.cat_name,
-            "status": category.status
-        }, status=200)
-    return JsonResponse({"error": "Invalid request method."}, status=400)
+    category = get_object_or_404(Cat, pk=pk)
+    category.status = not category.status
+    category.save()
+    return Response({
+        "success": True,
+        "message": "Category status updated successfully.",
+        "id": category.cat_id,
+        "name": category.cat_name,
+        "status": category.status
+    })
 
 
-@csrf_exempt
+@api_view(['POST'])
 def user_toggle_status(request, pk):
-    
-    if request.method == "POST":
-        user = get_object_or_404(Users, pk=pk)
+    user = get_object_or_404(Users, pk=pk)
         # Toggle status (1 becomes 0 and 0 becomes 1)
-        user.status = not user.status
-        user.save()
+    user.status = not user.status
+    user.save()
 
-        return JsonResponse({
+    return JsonResponse({
             "success": True,
             "message": "User status updated successfully.",
             "id": user.user_id,
             "name": user.name,
             "status": user.status
         }, status=200)
-    return JsonResponse({"error": "Invalid request method."}, status=400)
+   
+    
+        
 
 # @csrf_exempt
 # def user_type_toggle_status(request, pk):
@@ -489,20 +477,18 @@ def user_toggle_status(request, pk):
 #         }, status=200)
 #     return JsonResponse({"error": "Invalid request method."}, status=400)
 
-@csrf_exempt
+@api_view(['POST'])
 def user_type_toggle_status(request, pk):
-    if request.method == "POST":
-        user = get_object_or_404(Users, pk=pk)
+    user = get_object_or_404(Users, pk=pk)
+    # Toggle between 'PAID' and 'FREE'
+    if user.user_type and user.user_type.upper() == "PAID":
+        user.user_type = "FREE"
+    else:
+        user.user_type = "PAID"
 
-        # Toggle between 'PAID' and 'FREE'
-        if user.user_type and user.user_type.upper() == "PAID":
-            user.user_type = "FREE"
-        else:
-            user.user_type = "PAID"
+    user.save(update_fields=["user_type"])
 
-        user.save(update_fields=["user_type"])
-
-        return JsonResponse({
+    return JsonResponse({
             "success": True,
             "message": "User type updated successfully.",
             "id": user.user_id,
@@ -510,8 +496,6 @@ def user_type_toggle_status(request, pk):
             # Send boolean to Flutter (True = PAID, False = FREE)
             "user_type": True if user.user_type == "PAID" else False
         }, status=200)
-
-    return JsonResponse({"error": "Invalid request method."}, status=400)
 
 
 
@@ -722,7 +706,6 @@ def download_user(request):
 
 
 
-
 @api_view(['GET'])
 def dashboard_stats(request):
     today_start = datetime.combine(now().date(), datetime.min.time()).replace(tzinfo=timezone.utc)
@@ -787,6 +770,75 @@ def dashboard_stats(request):
         "last7_logins": last7_logins,
         "last30_logins": last30_logins,
     })
+
+
+
+
+
+# @api_view(['GET'])
+# def dashboard_stats(request):
+#     today_start = datetime.combine(now().date(), datetime.min.time()).replace(tzinfo=timezone.utc)
+#     today_end = datetime.combine(now().date(), datetime.max.time()).replace(tzinfo=timezone.utc)
+
+#     last7_start = today_start - timedelta(days=7)
+#     last30_start = today_start - timedelta(days=30)
+
+#     # Registrations grouped by day (last 30 days) – ORM version (তুমি চাইলে বাদ দিতে পারো)
+#     reg_counts = (
+#         Reg.objects.filter(created_date__range=(last30_start, today_end))
+#         .extra(select={'day': "DATE(created_date)"})
+#         .values('day')
+#         .annotate(count=Count('reg_id'))
+#         .order_by('day')
+#     )
+#     reg_counts_day = (
+#     Reg.objects
+#     .annotate(day=TruncDate('created_date', tzinfo=None))  # timezone conversion বন্ধ
+#     .values('day')
+#     .annotate(count=Count('reg_id'))
+#     .order_by('-day')
+# )
+#     registrations_day = [
+#     {"day": row["day"].isoformat(), "count": row["count"]}
+#     for row in reg_counts_day
+# ]
+
+#     # Month-wise registrations 
+#     reg_counts_month = (
+#         Reg.objects
+#         .annotate(month=TruncMonth('created_date', tzinfo=None))  # timezone conversion বন্ধ
+#         .values('month')
+#         .annotate(count=Count('reg_id'))
+#         .order_by('-month')
+#     )
+    
+#     registrations_month = [
+#     {"month": row["month"].strftime("%Y-%m"), "count": row["count"]}
+#     for row in reg_counts_month
+# ]
+
+
+#     # Posts today and last 7/30 days
+#     today_posts = Post.objects.filter(post_time__range=(today_start, today_end)).count()
+#     last7_posts = Post.objects.filter(post_time__gte=last7_start).count()
+#     last30_posts = Post.objects.filter(post_time__gte=last30_start).count()
+
+#     # User logins today, last 7/30 days
+#     today_logins = Users.objects.filter(user_logged_date__range=(today_start, today_end)).count()
+#     last7_logins = Users.objects.filter(user_logged_date__gte=last7_start).count()
+#     last30_logins = Users.objects.filter(user_logged_date__gte=last30_start).count()
+
+#     return Response({
+#         "registrations": list(reg_counts),      # ORM last30 days
+#         "registrations_day": registrations_day,           # Raw SQL all days
+#         "registrations_month": registrations_month,       # Raw SQL all months
+#         "today_posts": today_posts,
+#         "last7_posts": last7_posts,
+#         "last30_posts": last30_posts,
+#         "today_logins": today_logins,
+#         "last7_logins": last7_logins,
+#         "last30_logins": last30_logins,
+#     })
 
 
 
