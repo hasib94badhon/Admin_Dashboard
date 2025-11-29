@@ -33,8 +33,8 @@ Route<dynamic> generateRoute(RouteSettings settings) {
       return _getPageRoute(const ReferralPage());
     case deactivationPageRoute:
       return _getPageRoute(const DeactivationPage());
-    // case servicePageRoute:
-    //   return _getPageRoute(const ServicePage());
+    case servicePageRoute:
+      return _getPageRoute(const ServicePage());
     // case shopPageRoute:
     //   return _getPageRoute(const ShopPage());
     // case locationPageRoute:

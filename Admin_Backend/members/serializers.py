@@ -65,3 +65,39 @@ class UserReferralSerializer(serializers.ModelSerializer):
             return UserSerializer(user).data
         except Users.DoesNotExist:
             return None
+
+
+class ServiceUserSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source='user_id.name', read_only=True)
+    cat_name = serializers.CharField(source='cat_id.cat_name', read_only=True)
+    phone = serializers.CharField(source='user_id.phone', read_only=True)
+    photo = serializers.CharField(source='user_id.photo', read_only=True)
+    subscriber_type = serializers.SerializerMethodField()
+    last_pay = serializers.SerializerMethodField()
+    location_address = serializers.SerializerMethodField()
+    location_updated_at = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Service
+        fields = [
+            'user_id', 'service_id', 'name', 'date_time',
+            'user_name', 'cat_name', 'phone', 'photo',
+            'subscriber_type', 'last_pay',
+            'location_address', 'location_updated_at'
+        ]
+
+    def get_subscriber_type(self, obj):
+        sub = Subscribers.objects.filter(user_id=obj.user_id.user_id).first()
+        return sub.type if sub else "N/A"
+
+    def get_last_pay(self, obj):
+        sub = Subscribers.objects.filter(user_id=obj.user_id.user_id).first()
+        return sub.last_pay if sub and sub.last_pay else "N/A"
+
+    def get_location_address(self, obj):
+        loc = Location.objects.filter(user_id=obj.user_id.user_id).first()
+        return loc.address if loc else "N/A"
+
+    def get_location_updated_at(self, obj):
+        loc = Location.objects.filter(user_id=obj.user_id.user_id).first()
+        return loc.updated_at if loc else "N/A"

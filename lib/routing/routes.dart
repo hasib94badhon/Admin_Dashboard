@@ -56,7 +56,7 @@ List<MenuItem> sideMenuItemRoutes = [
   MenuItem(subscriberPageDisplayName, subscriberPageRoute),
   MenuItem(referralPageDisplayName, referralPageRoute),
   MenuItem(deactivationPageDisplayName, deactivationPageRoute),
-  // MenuItem(servicePageDisplayName, servicePageRoute),
+  MenuItem(servicePageDisplayName, servicePageRoute),
   // MenuItem(shopPageDisplayName, shopPageRoute),
   // MenuItem(locationPageDisplayName, locationPageRoute),
   // MenuItem(authenticationPageDisplayName, authenticationPageRoute),

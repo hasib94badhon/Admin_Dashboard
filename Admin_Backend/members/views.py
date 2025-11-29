@@ -23,10 +23,11 @@ from django.contrib.auth import authenticate
 from rest_framework.decorators import api_view
 from django.utils import timezone
 from django.utils.timezone import now,localdate
-from django.db.models import Count,Q, F, OuterRef, Subquery, IntegerField, Value,Sum
+from django.db.models import Count,Q, F, OuterRef, Subquery, IntegerField, Value,Sum,Case, When, Value
 from datetime import timedelta, datetime,  timezone
 from django.db.models.functions import TruncDate,TruncMonth,Coalesce
 from rest_framework import status
+from rest_framework.pagination import PageNumberPagination
 
 
 
@@ -499,88 +500,6 @@ def user_type_toggle_status(request, pk):
 
 
 
-# def get_users(request):
-#     """
-#     API to fetch, search, and sort Users data based on different criteria.
-#     Query parameters:
-#         - sort: Defines the sorting method ('recent', 'category', 'user_type', 'user_called').
-#         - category: (Optional) Filter users by a specific category ID.
-#         - user_type: (Optional) Filter by user_type ('free' or 'paid').
-#         - search: (Optional) Search for a user by user_id. Returns specific user data if provided.
-#     """
-#     if request.method == 'GET':
-#         sort_by = request.GET.get('sort', 'recent')
-#         category = request.GET.get('category', None)
-#         user_type = request.GET.get('user_type', None)
-#         search = request.GET.get('search', None)  # Search by user_id
-#         user_id = request.GET.get('search', None)
-#         download = request.GET.get('download', None) 
-
-#         users = Users.objects.all()
-#         cats = Cat.objects.all()
-#         print(type(cats))
-
-
-#         if search:
-#             users = users.filter(user_id=search)
-
-#         # Filter by category
-#         if category:
-#             users = users.filter(cat_id=category)
-
-#         # Filter by user_type
-#         if user_type:
-#             users = users.filter(user_type=user_type)
-        
-#          #Query users
-#         if user_id:  # Fetch a specific user
-#             users = Users.objects.filter(user_id=user_id)
-            
-#             if not users.exists():
-#                 return JsonResponse({'error': 'User not found'}, status=404)
-#         else:  # Fetch all users
-#             users = Users.objects.all()
-        
-#         user_data = list(users.select_related('cat_id').values(
-#         'user_id', 'name', 'phone', 'description', 'location', 'photo',
-#         'user_type', 'status', 'user_shared', 'user_viewed', 'user_called',
-#         'user_total_post', 'user_logged_date', 'cat_id',
-#         'cat__cat_name'  # <-- Fetch cat_name from related Cat model
-#         ))
-
-#         for u in user_data:
-#             if isinstance(u['user_type'], str):
-#                 u['user_type'] = True if u['user_type'].lower() == 'paid' else False
-       
-#         # Sort by criteria
-#         if sort_by == 'recent':
-#             users = users.order_by('-user_logged_date')  # Most recent
-#         elif sort_by == 'category':
-#             users = users.order_by('cat_id')  # Sorted by category ID
-#         elif sort_by == 'paid':
-#             users = users.filter(user_type__iexact='PAID')
-#         elif sort_by == 'free':
-#             users = users.filter(user_type__iexact='FREE')
-#         elif sort_by == 'user_called':
-#             users = users.order_by('-user_called')  # Highest to lowest calls
-#         else:
-#             return JsonResponse({'error': 'Invalid sort parameter'}, status=400)
-
-#         # Format response for multiple users
-       
-#         user_data = list(users.select_related('cat').values(
-#                 'user_id', 'name', 'phone', 'description', 'location', 'photo',
-#                 'user_type', 'status', 'user_shared', 'user_viewed', 'user_called',
-#                 'user_total_post', 'user_logged_date', 'cat_id',
-#                 'cat_id__cat_name'  # <-- Fetch cat_name from related Cat model
-#             ))
-        
-        
-
-#         return JsonResponse({'users': user_data}, status=200, safe=False)
-
-#     return JsonResponse({'error': 'Invalid request method'}, status=405)
-
 
 def get_users(request):
     """
@@ -1013,3 +932,91 @@ def update_referral(request, pk):
         "paid_at": referral.paid_at,
         "verification": referral.verification
     })
+
+
+  # 🔎 Pagination
+class ServiceUserPagination(PageNumberPagination):
+      page_size = 20
+      page_size_query_param = 'page_size'
+      max_page_size = 100
+          
+
+class ServiceUserList(APIView):
+    def get(self, request):
+        queryset = Service.objects.all().order_by('service_id')
+
+        # 🔎 Search filters
+        search = request.GET.get('search')
+        if search:
+            queryset = queryset.filter(
+                  Q(name__icontains=search) |
+                Q(service_id__icontains=search) |
+                Q(user_id__name__icontains=search) |
+                Q(user_id__phone__icontains=search) |
+                Q(cat_id__cat_name__icontains=search) |
+                Q(location__icontains=search)
+            )
+
+        # 🔎 Sorting
+        sort_by = request.GET.get('sort')
+        if sort_by == 'cat':
+            queryset = queryset.order_by('cat_id__cat_name')
+        elif sort_by == 'recent':
+            queryset = queryset.order_by('-date_time')
+        # elif sort_by == 'location':
+        #     queryset = queryset.order_by('service.user_location.address')
+        elif sort_by == 'location':
+
+            location_subquery = Location.objects.filter(
+                user_id=OuterRef('user_id')
+            ).values('address')[:1]
+
+            queryset = queryset.annotate(location_address=Subquery(location_subquery))
+            queryset = queryset.order_by('location_address')
+
+        elif sort_by == 'subscriber':
+            subscriber_subquery = Subscribers.objects.filter(
+            user_id=OuterRef('user_id_id')
+        ).values('type')[:1]
+
+            queryset = queryset.annotate(subscriber_type=Subquery(subscriber_subquery))
+
+            queryset = queryset.annotate(
+            subscriber_order=Case(
+                When(subscriber_type='paid', then=Value(0)),
+                When(subscriber_type='unpaid', then=Value(1)),
+                default=Value(2),
+                output_field=IntegerField(),
+            )
+        ).order_by('subscriber_order')
+
+      
+
+        paginator = ServiceUserPagination()
+        result_page = paginator.paginate_queryset(queryset, request)
+        serializer = ServiceUserSerializer(result_page, many=True)
+
+        # 🔎 Summary stats
+        total_services = queryset.count()
+        total_paid = Subscribers.objects.filter(
+            type__iexact='paid',
+            user_id__in=queryset.values('user_id')
+        ).count()
+        total_unpaid = Subscribers.objects.filter(
+            type__iexact='unpaid',
+            user_id__in=queryset.values('user_id')
+        ).count()
+        total_cat = queryset.values('cat_id').distinct().count()
+
+        summary = {
+            "total_services": total_services,
+            "total_paid": total_paid,
+            "total_unpaid": total_unpaid,
+            "total_cat": total_cat
+        }
+
+        return paginator.get_paginated_response({
+            "summary": summary,
+            "results": serializer.data
+        })
+

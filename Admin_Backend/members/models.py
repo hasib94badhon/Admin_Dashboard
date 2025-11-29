@@ -8,6 +8,38 @@
 from django.db import models
 
 
+
+class Users(models.Model):
+    user_id = models.AutoField(primary_key=True)
+    reg_id = models.IntegerField()
+    # cat_id = models.IntegerField()
+    cat = models.ForeignKey('Cat', models.DO_NOTHING, db_column='cat_id')
+    name = models.TextField()
+    phone = models.CharField(max_length=255)
+    description = models.TextField()
+    location = models.TextField()
+    photo = models.TextField(blank=True, null=True)
+    user_type = models.CharField(max_length=255)
+
+    status = models.BooleanField()
+    user_shared = models.IntegerField()
+    user_viewed = models.IntegerField()
+    user_called = models.IntegerField()
+    user_total_post = models.IntegerField()
+    user_logged_date = models.DateTimeField(blank=True, null=True)
+    call_status = models.CharField(max_length=10, blank=True, null=True)
+    nid = models.TextField()
+    tin = models.TextField()
+    self_referral_id = models.CharField(max_length=8)
+    reg_referral_id = models.CharField(max_length=8)
+    email = models.CharField(max_length=255)
+    is_active = models.IntegerField()
+    deactivated_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'users'
+
 class AboutInfo(models.Model):
     about = models.TextField(blank=True, null=True)
     founders = models.TextField(blank=True, null=True)
@@ -327,14 +359,18 @@ class Reg(models.Model):
 
 class Service(models.Model):
     service_id = models.AutoField(primary_key=True)
-    cat_id = models.IntegerField()
+    cat_id = models.ForeignKey(Cat, models.DO_NOTHING, db_column='cat_id')
     name = models.CharField(max_length=255)
     location = models.CharField(max_length=255)
     description = models.TextField()
     photo = models.CharField(max_length=255)
     phone = models.IntegerField()
     date_time = models.DateTimeField()
-    user_id = models.IntegerField()
+    user_id = models.ForeignKey(Users, models.DO_NOTHING, db_column='user_id')
+
+    @property
+    def user_location(self):
+        return Location.objects.filter(user_id=self.user_id_id).first()
 
     class Meta:
         managed = False
@@ -419,36 +455,7 @@ class UserReferrals(models.Model):
         db_table = 'user_referrals'
 
 
-class Users(models.Model):
-    user_id = models.AutoField(primary_key=True)
-    reg_id = models.IntegerField()
-    # cat_id = models.IntegerField()
-    cat = models.ForeignKey('Cat', models.DO_NOTHING, db_column='cat_id')
-    name = models.TextField()
-    phone = models.CharField(max_length=255)
-    description = models.TextField()
-    location = models.TextField()
-    photo = models.TextField(blank=True, null=True)
-    user_type = models.CharField(max_length=255)
 
-    status = models.BooleanField()
-    user_shared = models.IntegerField()
-    user_viewed = models.IntegerField()
-    user_called = models.IntegerField()
-    user_total_post = models.IntegerField()
-    user_logged_date = models.DateTimeField(blank=True, null=True)
-    call_status = models.CharField(max_length=10, blank=True, null=True)
-    nid = models.TextField()
-    tin = models.TextField()
-    self_referral_id = models.CharField(max_length=8)
-    reg_referral_id = models.CharField(max_length=8)
-    email = models.CharField(max_length=255)
-    is_active = models.IntegerField()
-    deactivated_at = models.DateTimeField(blank=True, null=True)
-
-    class Meta:
-        managed = False
-        db_table = 'users'
 
 
 class ViewList(models.Model):
