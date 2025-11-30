@@ -380,13 +380,18 @@ class Service(models.Model):
 class Shop(models.Model):
     shop_id = models.AutoField(primary_key=True)
     name = models.CharField(max_length=255)
-    cat_id = models.IntegerField()
+    cat_id = models.ForeignKey(Cat, models.DO_NOTHING, db_column='cat_id')
     location = models.CharField(max_length=255)
     description = models.TextField()
     phone = models.IntegerField()
     photo = models.CharField(max_length=255)
     date_time = models.DateTimeField()
-    user = models.ForeignKey('Users', models.DO_NOTHING)
+    # user = models.ForeignKey('Users', models.DO_NOTHING)
+    user_id = models.ForeignKey(Users, models.DO_NOTHING, db_column='user_id')
+
+    @property
+    def user_location(self):
+        return Location.objects.filter(user_id=self.user_id_id).first()
 
     class Meta:
         managed = False

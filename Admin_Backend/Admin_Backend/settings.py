@@ -26,7 +26,7 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 # OR, if you want to allow all origins (not recommended for production):
-CORS_ALLOW_ALL_ORIGINS = False
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
@@ -35,7 +35,7 @@ CORS_ALLOW_ALL_ORIGINS = False
 SECRET_KEY = 'django-insecure-e!n^1x7#(_d3$4$$2yg3^sa)pw)$5u28lv5*1aw))b2e6sy8k1'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 ALLOWED_HOSTS = [ 
     "control.aarambd.com", 
@@ -60,6 +60,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'members'
 ]
+# 'corsheaders.middleware.CorsMiddleware' is already included at the top of the MIDDLEWARE list below.
 
 CORS_ALLOW_ALL_ORIGINS = True
 
@@ -72,7 +73,7 @@ CORS_ALLOW_METHODS = [
     'OPTIONS',
 ]
 
-CORS_ALLOW_HEADERS = ["content-type"]
+CORS_ALLOW_HEADERS = ['*']
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
@@ -159,6 +160,10 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / "staticfiles"
+
+MEDIA_URL = '/upload/'
+MEDIA_ROOT = BASE_DIR / 'upload'
+
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field

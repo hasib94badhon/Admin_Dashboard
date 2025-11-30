@@ -1,5 +1,7 @@
-from django.urls import path
+from django.urls import path,include
 from .views import *
+from django.conf import settings
+from django.conf.urls.static import static
 
 
 urlpatterns = [
@@ -23,8 +25,12 @@ urlpatterns = [
     path('api/deactivated-users/', deactivated_users, name='deactivated_users'),
     path('api/referrals/', referral_list, name='referral-list'),
     path("api/referrals/<int:pk>/update/", update_referral),
-     path('api/service-users/', ServiceUserList.as_view(), name='service-users')
+    path('api/service-users/', ServiceUserList.as_view(), name='service-users'),
+    path('api/shop-users/', ShopUserList.as_view(), name='shop-users')
 
 
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 

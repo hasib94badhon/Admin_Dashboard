@@ -23,7 +23,7 @@ from django.contrib.auth import authenticate
 from rest_framework.decorators import api_view
 from django.utils import timezone
 from django.utils.timezone import now,localdate
-from django.db.models import Count,Q, F, OuterRef, Subquery, IntegerField, Value,Sum,Case, When, Value
+from django.db.models import Count,Q, F, OuterRef, Subquery, IntegerField, Value,Sum,Case, When, Value,Exists
 from datetime import timedelta, datetime,  timezone
 from django.db.models.functions import TruncDate,TruncMonth,Coalesce
 from rest_framework import status
@@ -947,6 +947,10 @@ class ServiceUserList(APIView):
 
         # 🔎 Search filters
         search = request.GET.get('search')
+        location_filter = Location.objects.filter(
+        user_id=OuterRef('user_id_id'),
+        address__icontains=search
+    )
         if search:
             queryset = queryset.filter(
                   Q(name__icontains=search) |
@@ -954,7 +958,7 @@ class ServiceUserList(APIView):
                 Q(user_id__name__icontains=search) |
                 Q(user_id__phone__icontains=search) |
                 Q(cat_id__cat_name__icontains=search) |
-                Q(location__icontains=search)
+                Exists(location_filter)
             )
 
         # 🔎 Sorting
@@ -1020,3 +1024,93 @@ class ServiceUserList(APIView):
             "results": serializer.data
         })
 
+
+
+class ShopUserPagination(PageNumberPagination):
+      page_size = 20
+      page_size_query_param = 'page_size'
+      max_page_size = 100
+          
+
+class ShopUserList(APIView):
+    def get(self, request):
+        queryset = Shop.objects.all().order_by('shop_id')
+
+        # 🔎 Search filters
+        search = request.GET.get('search')
+        location_filter = Location.objects.filter(
+        user_id=OuterRef('user_id_id'),
+        address__icontains=search
+    )
+        if search:
+            queryset = queryset.filter(
+                  Q(name__icontains=search) |
+                Q(shop_id__icontains=search) |
+                Q(user_id__name__icontains=search) |
+                Q(user_id__phone__icontains=search) |
+                Q(cat_id__cat_name__icontains=search) |
+                Exists(location_filter)
+            )
+
+        # 🔎 Sorting
+        sort_by = request.GET.get('sort')
+        if sort_by == 'cat':
+            queryset = queryset.order_by('cat_id__cat_name')
+        elif sort_by == 'recent':
+            queryset = queryset.order_by('-date_time')
+        # elif sort_by == 'location':
+        #     queryset = queryset.order_by('service.user_location.address')
+        elif sort_by == 'location':
+
+            location_subquery = Location.objects.filter(
+                user_id=OuterRef('user_id')
+            ).values('address')[:1]
+
+            queryset = queryset.annotate(location_address=Subquery(location_subquery))
+            queryset = queryset.order_by('location_address')
+
+        elif sort_by == 'subscriber':
+            subscriber_subquery = Subscribers.objects.filter(
+            user_id=OuterRef('user_id_id')
+        ).values('type')[:1]
+
+            queryset = queryset.annotate(subscriber_type=Subquery(subscriber_subquery))
+
+            queryset = queryset.annotate(
+            subscriber_order=Case(
+                When(subscriber_type='paid', then=Value(0)),
+                When(subscriber_type='unpaid', then=Value(1)),
+                default=Value(2),
+                output_field=IntegerField(),
+            )
+        ).order_by('subscriber_order')
+
+      
+
+        paginator = ShopUserPagination()
+        result_page = paginator.paginate_queryset(queryset, request)
+        serializer = ShopUserSerializer(result_page, many=True)
+
+        # 🔎 Summary stats
+        total_shops = queryset.count()
+        total_paid = Subscribers.objects.filter(
+            type__iexact='paid',
+            user_id__in=queryset.values('user_id')
+        ).count()
+        total_unpaid = Subscribers.objects.filter(
+            type__iexact='unpaid',
+            user_id__in=queryset.values('user_id')
+        ).count()
+        total_cat = queryset.values('cat_id').distinct().count()
+
+        summary = {
+            "total_shops": total_shops,
+            "total_paid": total_paid,
+            "total_unpaid": total_unpaid,
+            "total_cat": total_cat
+        }
+
+        return paginator.get_paginated_response({
+            "summary": summary,
+            "results": serializer.data
+        })

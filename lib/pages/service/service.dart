@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:data_table_2/data_table_2.dart';
 import 'package:flutter_web_dashboard/config.dart';
+import 'package:flutter/services.dart';
 
 class ServicePage extends StatefulWidget {
   const ServicePage({super.key});
@@ -21,6 +22,14 @@ class _ServicePageState extends State<ServicePage> {
   String sortBy = "";
 
   final TextEditingController _searchController = TextEditingController();
+  final List<Color> rowColors = [
+    Colors.blue.shade50,
+    Colors.orange.shade50,
+    Colors.purple.shade50,
+    Colors.teal.shade50,
+    Colors.amber.shade50,
+    Colors.indigo.shade50,
+  ];
 
   @override
   void initState() {
@@ -52,6 +61,16 @@ class _ServicePageState extends State<ServicePage> {
       print("Error: ${response.statusCode}");
     }
     setState(() => isLoading = false);
+  }
+
+  void _copyRowData(Map<String, dynamic> row) {
+    // Row এর সব field কে একসাথে string বানাও
+    final buffer = StringBuffer();
+    row.forEach((key, value) {
+      buffer.writeln("$key: ${value ?? ''}");
+    });
+
+    Clipboard.setData(ClipboardData(text: buffer.toString()));
   }
 
   @override
@@ -94,7 +113,8 @@ class _ServicePageState extends State<ServicePage> {
                   child: TextField(
                     controller: _searchController,
                     decoration: const InputDecoration(
-                      hintText: "Search...",
+                      hintText:
+                          "Search with Service ID / Name / Phone / Category / Location",
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.search),
                     ),
@@ -130,10 +150,12 @@ class _ServicePageState extends State<ServicePage> {
           // 🔎 DataTable2 with horizontal scroll
           Expanded(
             child: DataTable2(
-              headingRowColor: MaterialStateProperty.all(Colors.grey[200]),
-              columnSpacing: 12,
+              headingRowColor: MaterialStateProperty.all(
+                  const Color.fromARGB(255, 80, 237, 213)),
+              columnSpacing: 20,
               horizontalMargin: 12,
-              minWidth: 1200,
+              dataRowHeight: 80,
+              minWidth: 1400,
               columns: const [
                 DataColumn(
                     label: Text("Service ID",
@@ -162,30 +184,62 @@ class _ServicePageState extends State<ServicePage> {
                 DataColumn(
                     label: Text("Location Updated At",
                         style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(
+                    label: Text("Copy Data",
+                        style: TextStyle(fontWeight: FontWeight.bold))),
               ],
-              rows: services.map((s) {
+              rows: services.asMap().entries.map((entry) {
+                final index = entry.key;
+                final s = entry.value;
                 final subscriberType = s['subscriber_type'] ?? "";
                 final subscriberColor = subscriberType.toLowerCase() == "paid"
                     ? Colors.green
                     : Colors.red;
 
-                return DataRow(cells: [
-                  DataCell(_buildCellText(s['service_id'].toString())),
-                  DataCell(_buildCellText(s['user_name'] ?? "")),
-                  DataCell(_buildCellText(s['cat_name'] ?? "")),
-                  DataCell(_buildCellText(s['phone'] ?? "")),
-                  DataCell(Text(
-                    subscriberType,
-                    style: TextStyle(
-                        color: subscriberColor, fontWeight: FontWeight.bold),
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  )),
-                  DataCell(_buildCellText(s['last_pay'] ?? "")),
-                  DataCell(_buildCellText(s['date_time'] ?? "")),
-                  DataCell(_buildCellText(s['location_address'] ?? "")),
-                  DataCell(_buildCellText(s['location_updated_at'] ?? "")),
-                ]);
+                return DataRow(
+                    color: WidgetStateProperty.all(
+                      rowColors[index % rowColors.length],
+                    ),
+                    cells: [
+                      DataCell(_buildCellText(s['service_id'].toString())),
+                      DataCell(_buildCellText(s['user_name'])),
+                      // DataCell(_buildCellText(s['user_name'] ?? "")),
+                      DataCell(_buildCellText(s['cat_name'] ?? "")),
+                      DataCell(_buildCellText(s['phone'] ?? "")),
+                      DataCell(Text(
+                        subscriberType,
+                        style: TextStyle(
+                            color: subscriberColor,
+                            fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      )),
+                      DataCell(_buildCellText(
+                          ServiceShopDateTimeFormatter.formatDateTime(
+                              s['last_pay'] ?? ""))),
+                      DataCell(_buildCellText(
+                          ServiceShopDateTimeFormatter.formatDateTime(
+                              s['date_time'] ?? ""))),
+                      DataCell(_buildCellText(s['location_address'] ?? "")),
+                      DataCell(_buildCellText(
+                          ServiceShopDateTimeFormatter.formatDateTime(
+                              s['location_updated_at'] ?? ""))),
+                      DataCell(
+                        IconButton(
+                          icon: const Icon(Icons.copy, color: Colors.blue),
+                          tooltip: "Copy row data",
+                          onPressed: () {
+                            _copyRowData(s);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content:
+                                      Text("Row data copied to clipboard")),
+                            );
+                          },
+                        ),
+                      ),
+                    ]);
               }).toList(),
             ),
           ),
@@ -245,9 +299,54 @@ class _ServicePageState extends State<ServicePage> {
   Widget _buildCellText(String text) {
     return Text(
       text,
-      maxLines: 2,
+      maxLines: 3,
       overflow: TextOverflow.ellipsis,
       softWrap: true,
+      textAlign: TextAlign.left,
+    );
+  }
+
+  Widget _buildNameWithPhoto(String? name, String? photo) {
+    // যদি photo null বা empty হয় → default icon
+    if (photo == null || photo.trim().isEmpty) {
+      return Row(
+        children: [
+          const Icon(Icons.person, size: 24, color: Colors.grey),
+          const SizedBox(width: 8),
+          Expanded(
+              child: Text(
+            name ?? "",
+            overflow: TextOverflow.ellipsis,
+            maxLines: 3,
+          )),
+        ],
+      );
+    }
+
+    // multiple হলে split করে প্রথমটা নাও
+    final firstPhoto = photo.split(",").first.trim();
+
+    return Row(
+      children: [
+        CircleAvatar(
+          radius: 16,
+          backgroundImage: NetworkImage(firstPhoto),
+          onBackgroundImageError: (_, __) {
+            // যদি image load fail করে → fallback icon
+          },
+          child: firstPhoto.isEmpty
+              ? const Icon(Icons.person, size: 20, color: Colors.grey)
+              : null,
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+            child: Text(
+          name ?? "",
+          overflow: TextOverflow.ellipsis,
+          maxLines: 3,
+          softWrap: true,
+        )),
+      ],
     );
   }
 }

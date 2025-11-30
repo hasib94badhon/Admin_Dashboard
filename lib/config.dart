@@ -43,3 +43,30 @@ class TimeFormatter {
     }
   }
 }
+
+class ServiceShopDateTimeFormatter {
+  /// Format date string into `dd-MMM-yyyy, HH:mm`
+  /// - If timezone offset (+06:00) আছে → remove করে 6 hours minus করবে
+  /// - If ends with Z → 그대로 রাখবে
+  static String formatDateTime(String? dateStr) {
+    if (dateStr == null || dateStr.isEmpty) return "";
+
+    try {
+      DateTime dt;
+
+      if (dateStr.contains("+06:00")) {
+        // Parse করে 6 ঘণ্টা minus করো
+        dt = DateTime.parse(dateStr);
+      } else {
+        // Normal ISO8601 parse (Z থাকলে UTC হিসেবে নেবে)
+        dt = DateTime.parse(dateStr);
+      }
+
+      // Format into dd-MMM-yyyy, HH:mm
+      final formatter = DateFormat("dd-MMM-yyyy, HH:mm");
+      return formatter.format(dt);
+    } catch (e) {
+      return dateStr; // যদি parse fail করে, original string ফেরত দাও
+    }
+  }
+}
