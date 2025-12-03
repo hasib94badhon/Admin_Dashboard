@@ -27,8 +27,6 @@ Route<dynamic> generateRoute(RouteSettings settings) {
       return _getPageRoute(const AppStatusPage());
     case staffAdminPageRoute:
       return _getPageRoute(const StaffAdminPage());
-    case subscriberPageRoute:
-      return _getPageRoute(const SubscriberPage());
     case referralPageRoute:
       return _getPageRoute(const ReferralPage());
     case deactivationPageRoute:
@@ -37,8 +35,8 @@ Route<dynamic> generateRoute(RouteSettings settings) {
       return _getPageRoute(const ServicePage());
     case shopPageRoute:
       return _getPageRoute(const ShopPage());
-    // case locationPageRoute:
-    //   return _getPageRoute(const LocationPage());
+    case subscriberPageRoute:
+      return _getPageRoute(const SubscriberPage());
     default:
       return _getPageRoute(const OverviewPage());
   }

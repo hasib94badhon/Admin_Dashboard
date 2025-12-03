@@ -24,12 +24,22 @@ from rest_framework.decorators import api_view
 from django.utils import timezone
 from django.utils.timezone import now,localdate
 from django.db.models import Count,Q, F, OuterRef, Subquery, IntegerField, Value,Sum,Case, When, Value,Exists
-from datetime import timedelta, datetime,  timezone
+from datetime import timedelta, datetime
 from django.db.models.functions import TruncDate,TruncMonth,Coalesce
 from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
 
 
+def normalize_datetime(dt):
+    """
+    সব datetime কে naive করে দেয়, যাতে safe comparison করা যায়।
+    """
+    if not dt:
+        return None
+    try:
+        return timezone.make_naive(dt, timezone.get_current_timezone())
+    except Exception:
+        return dt
 
 
 @api_view(['POST'])
@@ -361,72 +371,78 @@ def fb_page_excel(request):
     file = request.FILES["file"]
 
     try:
-        # Save uploaded Excel file temporarily
         fs = FileSystemStorage()
         filename = fs.save(file.name, file)
         filepath = fs.path(filename)
 
-        # Read Excel sheet named "data"
         data = pd.read_excel(filepath, sheet_name='fb_page')
 
-        # Loop through each row in the Excel sheet
-        for index, row in data.iterrows():
-    
-            # raw_name = row.get("name", "")
-            name = str(row.get("name", "")).strip() if pd.notnull(name) else ""
+        added_count = 0
+        skipped_count = 0
+        total_rows = len(data)
 
-            # Handle phone
-            # raw_web = row.get("web", "")
-            web = str(row.get("web","")).strip() if pd.notnull(web) else ""
-            # raw_address = row.get("web", "")
-            address = str(row.get("address", "")).strip() if pd.notnull(address) else ""
+        for index, row in data.iterrows():
+            raw_name = row.get("name", "")
+            name = str(raw_name).strip() if pd.notnull(raw_name) else ""
+
+            raw_web = row.get("web", "")
+            web = str(raw_web).strip() if pd.notnull(raw_web) else ""
+
+            raw_address = row.get("address", "")
+            address = str(raw_address).strip() if pd.notnull(raw_address) else ""
 
             raw_phone = row.get("phone", "")
             if pd.notnull(raw_phone):
                 if isinstance(raw_phone, float):
-                    phone = "0"+str(int(raw_phone)).strip()
+                    phone = int(raw_phone)
                 else:
-                    phone = "0"+str(raw_phone).strip()
+                    phone = int(str(raw_phone).strip())
             else:
-                phone = ""
-            # if pd.notnull(raw_web):
-            #     if isinstance(raw_web, float):
-            #         phone = str(int(raw_web)).strip()
-            #     else:
-            #         phone = str(raw_web).strip()
-            # else:
-            #     phone = ""
+                phone = None
 
-            # Handle category
-            category = str(row.get("category", "")).strip() if pd.notnull(row.get("category", "")) else ""
+            raw_cat = row.get("category", "")
+            category = str(raw_cat).strip() if pd.notnull(raw_cat) else ""
 
-            # Handle photo
-            # photo = str(row.get("photo", "")).strip() if pd.notnull(row.get("photo", "")) else ""
+            raw_photo = row.get("photo", "")
+            photo = str(raw_photo).strip() if pd.notnull(raw_photo) else ""
 
-            # Skip if essential fields are empty
+            # Essential fields check
             if not name or not web or not category or not phone:
+                skipped_count += 1
                 continue
 
-            # Insert after checking duplicates
-            if not FbPage.objects.filter(name=name, web=web).exists():
-                Apps.objects.create(
-                    name = name,
-                    cat = category,
-                    phone = phone,
-                    location = address,
-                    link = web,
-                    visit_count = 0
-
+            # Insert if not duplicate
+            if not FbPage.objects.filter(name=name, link=web).exists():
+                FbPage.objects.create(
+                    name=name,
+                    cat=category,
+                    photo=photo,
+                    phone=phone,
+                    link=web,
+                    location=address,
+                    # time=timezone.localtime(timezone.now()),
+                    visit_count=0
                 )
+                added_count += 1
+            else:
+                skipped_count += 1
 
-
-        # Delete the uploaded temp file
         fs.delete(filename)
 
-        return JsonResponse({"message": "fb pages are uploaded successfully"}, status=201)
+        return JsonResponse({
+            "message": "FB pages processed successfully",
+            "summary": {
+                "total_rows": total_rows,
+                "added_count": added_count,
+                "skipped_count": skipped_count
+            }
+        }, status=201)
 
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+
+
+
 
 
 @api_view(['POST'])
@@ -1114,3 +1130,166 @@ class ShopUserList(APIView):
             "summary": summary,
             "results": serializer.data
         })
+
+
+
+class SubscriberPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = 'page_size'
+    max_page_size = 100
+
+class SubscriberListView(APIView):
+    def get(self, request):
+        queryset = Subscribers.objects.all()
+
+        # 🔎 Search
+        search = request.GET.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(user_id__icontains=search) |
+                Q(type__icontains=search) |
+                Q(cat_id__in=Cat.objects.filter(cat_name__icontains=search).values_list('cat_id', flat=True)) |
+                Q(user_id__in=Users.objects.filter(
+                    Q(name__icontains=search) |
+                    Q(phone__icontains=search)
+                ).values_list('user_id', flat=True)) |
+                Q(user_id__in=Service.objects.filter(
+                    Q(service_id__icontains=search)
+                ).values_list('user_id', flat=True)) |
+                Q(user_id__in=Shop.objects.filter(
+                    Q(shop_id__icontains=search)
+                ).values_list('user_id', flat=True))
+            )
+
+        # 🔎 Sort
+        sort_by = request.GET.get('sort')
+        if sort_by == "recent":
+            queryset = queryset.order_by("-last_pay")
+        elif sort_by == "type":
+            queryset = queryset.order_by("type")
+        elif sort_by == "cat":
+            queryset = queryset.order_by("cat_id")
+        elif sort_by == "service":
+            service_user_ids = Service.objects.values_list("user_id", flat=True)
+            queryset = queryset.filter(user_id__in=service_user_ids).order_by("user_id")
+        elif sort_by == "shop":
+            shop_user_ids = Shop.objects.values_list("user_id", flat=True)
+            queryset = queryset.filter(user_id__in=shop_user_ids).order_by("user_id")
+        # elif sort_by == "service":
+        #     queryset = queryset.order_by("user_id")  # service ভিত্তিক
+        # elif sort_by == "shop":
+        #     queryset = queryset.order_by("user_id")  # shop ভিত্তিক
+
+        # 🔎 Summary হিসাব করা হবে filtered queryset এর উপর
+        total_subscribers = queryset.count()
+
+        # Service vs Shop split
+        service_users = Service.objects.filter(user_id__in=queryset.values_list("user_id", flat=True))
+        shop_users = Shop.objects.filter(user_id__in=queryset.values_list("user_id", flat=True))
+
+        service_user_ids = service_users.values_list("user_id", flat=True)
+        shop_user_ids = shop_users.values_list("user_id", flat=True)
+
+        service_paid = queryset.filter(user_id__in=service_user_ids, type__iexact="paid").count()
+        service_unpaid = queryset.filter(user_id__in=service_user_ids, type__iexact="unpaid").count()
+
+        shop_paid = queryset.filter(user_id__in=shop_user_ids, type__iexact="paid").count()
+        shop_unpaid = queryset.filter(user_id__in=shop_user_ids, type__iexact="unpaid").count()
+
+        total_categories = queryset.values("cat_id").distinct().count()
+
+        summary = {
+            "total_subscribers": total_subscribers,
+            "service_paid": service_paid,
+            "service_unpaid": service_unpaid,
+            "shop_paid": shop_paid,
+            "shop_unpaid": shop_unpaid,
+            "total_categories": total_categories,
+        }
+
+        # 🔎 Pagination
+        paginator = SubscriberPagination()
+        result_page = paginator.paginate_queryset(queryset, request)
+        serializer = SubscriberSerializer(result_page, many=True)
+
+        return paginator.get_paginated_response({
+            "summary": summary,
+            "results": serializer.data
+        })
+    
+
+
+class CreateSubscribersView(APIView):
+    def post(self, request):
+        today = timezone.now()
+        ninety_days_ago = timezone.make_naive(today - timedelta(days=90), timezone.get_current_timezone())
+
+        created_subscribers = []
+        service_count = 0
+        shop_count = 0
+
+        # 🔎 Subscribers এ যাদের আছে তাদের বাদ দাও
+        existing_ids = Subscribers.objects.values_list("user_id", flat=True)
+        users = Users.objects.exclude(user_id__in=existing_ids)
+
+        for user in users:
+            eligible = False
+            source_type = None
+
+            # শর্ত ১: called > 50
+            if user.user_called and user.user_called > 50:
+                eligible = True
+
+            # শর্ত ২: Service/Shop date_time > 90 days
+            service = Service.objects.filter(user_id=user.user_id).first()
+            shop = Shop.objects.filter(user_id=user.user_id).first()
+
+            # if service and service.date_time < ninety_days_ago:
+            #     eligible = True
+            #     source_type = "service"
+            # if shop and shop.date_time < ninety_days_ago:
+            #     eligible = True
+            #     source_type = "shop"
+
+            if service and service.date_time:
+                service_dt = normalize_datetime(service.date_time)
+                if service_dt and service_dt < ninety_days_ago:
+                    eligible = True
+                    source_type = "service"
+
+            if shop and shop.date_time:
+                shop_dt = normalize_datetime(shop.date_time)
+                if shop_dt and shop_dt < ninety_days_ago:
+                    eligible = True
+                    source_type = "shop"
+
+
+            if eligible:
+                subscriber = Subscribers.objects.create(
+                    user_id=user.user_id,
+                    reg_id=user.reg_id,
+                    cat_id=user.cat_id,
+                    type="unpaid",  # default type
+                    last_pay=None,
+                    payment_history=None
+                )
+                created_subscribers.append(subscriber)
+
+                # ✅ Count service/shop
+                if source_type == "service":
+                    service_count += 1
+                elif source_type == "shop":
+                    shop_count += 1
+
+        serializer = SubscriberSerializerPost(created_subscribers, many=True)
+
+        summary = {
+            "total_new": len(created_subscribers),
+            "service_new": service_count,
+            "shop_new": shop_count
+        }
+
+        return Response({
+            "summary": summary,
+            "new_subscribers": serializer.data
+        }, status=status.HTTP_201_CREATED)

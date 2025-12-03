@@ -152,10 +152,10 @@ class _ServicePageState extends State<ServicePage> {
             child: DataTable2(
               headingRowColor: MaterialStateProperty.all(
                   const Color.fromARGB(255, 80, 237, 213)),
-              columnSpacing: 20,
+              columnSpacing: 22,
               horizontalMargin: 12,
               dataRowHeight: 80,
-              minWidth: 1400,
+              minWidth: 1500,
               columns: const [
                 DataColumn(
                     label: Text("Service ID",
@@ -182,7 +182,10 @@ class _ServicePageState extends State<ServicePage> {
                     label: Text("Location",
                         style: TextStyle(fontWeight: FontWeight.bold))),
                 DataColumn(
-                    label: Text("Location Updated At",
+                    label: Text("LocationUpdated",
+                        style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(
+                    label: Text("User ID",
                         style: TextStyle(fontWeight: FontWeight.bold))),
                 DataColumn(
                     label: Text("Copy Data",
@@ -225,6 +228,8 @@ class _ServicePageState extends State<ServicePage> {
                       DataCell(_buildCellText(
                           ServiceShopDateTimeFormatter.formatDateTime(
                               s['location_updated_at'] ?? ""))),
+
+                      DataCell(_buildCellText(s['user_id'].toString())),
                       DataCell(
                         IconButton(
                           icon: const Icon(Icons.copy, color: Colors.blue),

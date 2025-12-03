@@ -14,7 +14,7 @@ urlpatterns = [
     path('api/upload-users/', upload_excel, name='upload-users'),
     path('api/upload-hotline-numbers/', upload_hotline_numbers_excel, name='upload-hotline-numbers'),
     path('api/upload-apps/', apps_links_excel, name='upload-apps'),
-    path('api/upload-fb_page/', fb_page_excel, name='upload-fb_page'),
+    path('api/upload-fb/', fb_page_excel, name='upload-fb'),
     path('api/toggle-status/<int:pk>/', toggle_status, name='toggle_status'),
     path('api/user_toggle_status/<int:pk>/', user_toggle_status, name='user_toggle_status'),
     path('api/user-type-toggle-status/<int:pk>/', user_type_toggle_status, name='user_type_toggle_status'),
@@ -26,7 +26,9 @@ urlpatterns = [
     path('api/referrals/', referral_list, name='referral-list'),
     path("api/referrals/<int:pk>/update/", update_referral),
     path('api/service-users/', ServiceUserList.as_view(), name='service-users'),
-    path('api/shop-users/', ShopUserList.as_view(), name='shop-users')
+    path('api/shop-users/', ShopUserList.as_view(), name='shop-users'),
+    path('api/subscriber-users/', SubscriberListView.as_view(), name='subscriber-users'),
+    path('api/create-subscribers/', CreateSubscribersView.as_view(), name='create-subscribers')
 
 
 ]

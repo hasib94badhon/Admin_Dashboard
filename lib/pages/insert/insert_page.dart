@@ -29,6 +29,7 @@ class _InsertPageState extends State<InsertPage> {
   Uint8List? imageBytes; // Store image bytes for display
   PlatformFile? selectedFile; // Store the file data
   bool isUploading = false;
+  Map<String, dynamic>? fbSummary;
 
 // Function to pick an Excel file
   Future<void> pickExcelFile() async {
@@ -255,6 +256,56 @@ class _InsertPageState extends State<InsertPage> {
     }
   }
 
+  Future<void> uploadFbPages() async {
+    if (selectedFile == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please select an Excel file to upload.")),
+      );
+      return;
+    }
+
+    setState(() {
+      isUploading = true;
+    });
+
+    final uri = Uri.parse("$host/api/upload-fb/");
+    var request = http.MultipartRequest("POST", uri);
+
+    request.files.add(http.MultipartFile.fromBytes(
+      "file",
+      selectedFile!.bytes!,
+      filename: selectedFile!.name,
+    ));
+
+    try {
+      var response = await request.send();
+      var responseBody = await response.stream.bytesToString();
+
+      if (response.statusCode == 201) {
+        final Map<String, dynamic> jsonResponse = json.decode(responseBody);
+        setState(() {
+          fbSummary = jsonResponse["summary"];
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("FB Pages uploaded successfully!")),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Upload failed: $responseBody")),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Error: $e")),
+      );
+    } finally {
+      setState(() {
+        isUploading = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -300,7 +351,7 @@ class _InsertPageState extends State<InsertPage> {
                 if (selectedOption == "Hotline Numbers")
                   _buildHotlineNumbersForm(),
                 if (selectedOption == "Apps") _buildAppsForm(),
-                // if (selectedOption == "FB Page") _buildfbForm(),
+                if (selectedOption == "FB Page") _buildfbForm(),
               ],
             ),
           ),
@@ -501,6 +552,108 @@ class _InsertPageState extends State<InsertPage> {
               ? const CircularProgressIndicator(color: Colors.white)
               : const Text("Upload Apps"),
         ),
+      ],
+    );
+  }
+
+  Widget _buildfbForm() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          "Upload FB Page Data",
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
+        ),
+        const SizedBox(height: 10),
+        const Text(
+          """
+Excel file format guidelines:
+
+1. Required columns: 'name', 'web', 'address', 'phone', 'category', 'photo' (optional).
+2. Essential fields: 'name', 'web', 'phone', 'category' must be filled.
+3. Sheet name must be "fb_page".
+""",
+          style: TextStyle(
+              fontSize: 13, fontWeight: FontWeight.w500, color: Colors.red),
+        ),
+        const SizedBox(height: 20),
+        ElevatedButton.icon(
+          onPressed: pickExcelFile,
+          icon: const Icon(Icons.upload_file),
+          label: const Text("Select Excel Sheet"),
+        ),
+        const SizedBox(height: 10),
+        selectedFile != null
+            ? Text(
+                "Selected File: ${selectedFile!.name}",
+                style: const TextStyle(color: Colors.green),
+              )
+            : const Text(
+                "No file selected",
+                style: TextStyle(color: Colors.red),
+              ),
+        const SizedBox(height: 20),
+        ElevatedButton(
+          onPressed: isUploading ? null : uploadFbPages,
+          child: isUploading
+              ? const CircularProgressIndicator(color: Colors.white)
+              : const Text("Upload FB Pages"),
+        ),
+        const SizedBox(height: 20),
+
+        // ✅ Summary UI
+        if (fbSummary != null)
+          Card(
+            elevation: 3,
+            child: Padding(
+              padding: const EdgeInsets.all(12.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    "Upload Summary",
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 10),
+                  Table(
+                    border: TableBorder.all(color: Colors.grey),
+                    children: [
+                      TableRow(children: [
+                        const Padding(
+                          padding: EdgeInsets.all(8.0),
+                          child: Text("Total Rows"),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Text("${fbSummary!['total_rows']}"),
+                        ),
+                      ]),
+                      TableRow(children: [
+                        const Padding(
+                          padding: EdgeInsets.all(8.0),
+                          child: Text("Added"),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Text("${fbSummary!['added_count']}"),
+                        ),
+                      ]),
+                      TableRow(children: [
+                        const Padding(
+                          padding: EdgeInsets.all(8.0),
+                          child: Text("Skipped"),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.all(8.0),
+                          child: Text("${fbSummary!['skipped_count']}"),
+                        ),
+                      ]),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
       ],
     );
   }

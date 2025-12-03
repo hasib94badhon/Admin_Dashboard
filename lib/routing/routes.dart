@@ -18,9 +18,6 @@ const AppstatusPageRoute = "/appstatus";
 const staffAdminPageDisplayName = "Staff Admin";
 const staffAdminPageRoute = "/staff-admin";
 
-const subscriberPageDisplayName = "Subscriber";
-const subscriberPageRoute = "/subscriber";
-
 const referralPageDisplayName = "User Referral";
 const referralPageRoute = "/referral";
 
@@ -33,8 +30,8 @@ const servicePageRoute = "/service";
 const shopPageDisplayName = "Shop";
 const shopPageRoute = "/shop";
 
-const locationPageDisplayName = "Location";
-const locationPageRoute = "/location";
+const subscriberPageDisplayName = "Subscribers";
+const subscriberPageRoute = "/subscribers";
 
 const authenticationPageDisplayName = "Log out";
 const authenticationPageRoute = "/auth";
@@ -53,11 +50,10 @@ List<MenuItem> sideMenuItemRoutes = [
   MenuItem(InsertPageDisplayName, InsertPageRoute),
   MenuItem(AppstatusPageDisplayName, AppstatusPageRoute),
   // MenuItem(staffAdminPageDisplayName, staffAdminPageRoute),
-  MenuItem(subscriberPageDisplayName, subscriberPageRoute),
   MenuItem(referralPageDisplayName, referralPageRoute),
   MenuItem(deactivationPageDisplayName, deactivationPageRoute),
   MenuItem(servicePageDisplayName, servicePageRoute),
   MenuItem(shopPageDisplayName, shopPageRoute),
-  // MenuItem(locationPageDisplayName, locationPageRoute),
+  MenuItem(subscriberPageDisplayName, subscriberPageRoute),
   // MenuItem(authenticationPageDisplayName, authenticationPageRoute),
 ];

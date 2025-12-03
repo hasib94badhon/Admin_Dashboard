@@ -45,8 +45,6 @@ class MenuController extends GetxController {
         return _customIcon(Icons.miscellaneous_services, itemName);
       case shopPageDisplayName:
         return _customIcon(Icons.storefront, itemName);
-      case locationPageDisplayName:
-        return _customIcon(Icons.location_on, itemName);
       case authenticationPageDisplayName:
         return _customIcon(Icons.exit_to_app, itemName);
       default:

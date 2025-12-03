@@ -137,3 +137,54 @@ class ShopUserSerializer(serializers.ModelSerializer):
     def get_location_updated_at(self, obj):
         loc = Location.objects.filter(user_id=obj.user_id.user_id).first()
         return loc.updated_at if loc else "N/A"
+
+
+
+class SubscriberSerializer(serializers.ModelSerializer):
+    user_name = serializers.SerializerMethodField()
+    phone = serializers.SerializerMethodField()
+    category = serializers.SerializerMethodField()
+    service_id = serializers.SerializerMethodField()
+    shop_id = serializers.SerializerMethodField()
+    location_address = serializers.SerializerMethodField()
+    last_pay = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Subscribers
+        fields = [
+            "sub_id", "user_id", "user_name", "phone", "category",
+            "service_id", "shop_id", "type", "last_pay", "location_address"
+        ]
+
+    def get_user_name(self, obj):
+        user = Users.objects.filter(user_id=obj.user_id).first()
+        return user.name if user else None
+
+    def get_phone(self, obj):
+        user = Users.objects.filter(user_id=obj.user_id).first()
+        return user.phone if user else None
+
+    def get_category(self, obj):
+        cat = Cat.objects.filter(cat_id=obj.cat_id).first()
+        return cat.cat_name if cat else 'N/A'
+
+    def get_service_id(self, obj):
+        service = Service.objects.filter(user_id=obj.user_id).first()
+        return service.service_id if service else "N/A"
+
+    def get_shop_id(self, obj):
+        shop = Shop.objects.filter(user_id=obj.user_id).first()
+        return shop.shop_id if shop else "N/A"
+
+    def get_location_address(self, obj):
+        loc = Location.objects.filter(user_id=obj.user_id).first()
+        return loc.address if loc else 'N/A'
+    def get_last_pay(self, obj):
+        return obj.last_pay if obj.last_pay else 'N/A'
+
+
+# Add new subscribers
+class SubscriberSerializerPost(serializers.ModelSerializer):
+    class Meta:
+        model = Subscribers
+        fields = "__all__"

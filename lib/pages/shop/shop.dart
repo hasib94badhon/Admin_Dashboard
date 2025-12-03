@@ -154,10 +154,10 @@ class _ShopPageState extends State<ShopPage> {
             child: DataTable2(
               headingRowColor: MaterialStateProperty.all(
                   const Color.fromARGB(255, 191, 118, 206)),
-              columnSpacing: 20,
+              columnSpacing: 22,
               horizontalMargin: 12,
               dataRowHeight: 80,
-              minWidth: 1400,
+              minWidth: 1500,
               columns: const [
                 DataColumn(
                     label: Text("Shop ID",
@@ -184,7 +184,10 @@ class _ShopPageState extends State<ShopPage> {
                     label: Text("Location",
                         style: TextStyle(fontWeight: FontWeight.bold))),
                 DataColumn(
-                    label: Text("Location Updated At",
+                    label: Text("LocationUpdated",
+                        style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(
+                    label: Text("User ID",
                         style: TextStyle(fontWeight: FontWeight.bold))),
                 DataColumn(
                     label: Text("Copy Data",
@@ -228,6 +231,7 @@ class _ShopPageState extends State<ShopPage> {
                       DataCell(_buildCellText(
                           ServiceShopDateTimeFormatter.formatDateTime(
                               s['location_updated_at'] ?? ""))),
+                      DataCell(_buildCellText(s['user_id'].toString())),
                       DataCell(
                         IconButton(
                           icon: const Icon(Icons.copy, color: Colors.blue),

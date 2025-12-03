@@ -280,7 +280,7 @@ class FbPage(models.Model):
     phone = models.IntegerField()
     link = models.CharField(max_length=255)
     location = models.CharField(max_length=255)
-    time = models.DateTimeField()
+    time = models.DateTimeField(auto_now_add=True)
     visit_count = models.IntegerField()
 
     class Meta:
@@ -405,6 +405,7 @@ class Subscribers(models.Model):
     cat_id = models.IntegerField()
     type = models.CharField(max_length=255)
     last_pay = models.DateTimeField(blank=True, null=True)
+    payment_history = models.TextField(blank=True, null=True)
 
     class Meta:
         managed = False
