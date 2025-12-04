@@ -35,7 +35,7 @@ CORS_ALLOWED_ORIGINS = [
 SECRET_KEY = 'django-insecure-e!n^1x7#(_d3$4$$2yg3^sa)pw)$5u28lv5*1aw))b2e6sy8k1'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = [ 
     "control.aarambd.com", 

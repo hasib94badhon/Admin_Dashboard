@@ -1,7 +1,7 @@
 import 'package:intl/intl.dart';
 
-// final String host = 'https://control.aarambd.com';
-final String host = 'http://127.0.0.1:8000';
+final String host = 'https://control.aarambd.com';
+// final String host = 'http://127.0.0.1:8000';
 
 class NumberFormatter {
   static String formatNumber(int value) {
