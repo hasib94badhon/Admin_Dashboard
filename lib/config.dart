@@ -1,7 +1,7 @@
 import 'package:intl/intl.dart';
 
-final String host = 'https://control.aarambd.com';
-// final String host = 'http://127.0.0.1:8000';
+//final String host = 'https://control.aarambd.com';
+final String host = 'http://127.0.0.1:8000';
 
 class NumberFormatter {
   static String formatNumber(int value) {
@@ -45,9 +45,6 @@ class TimeFormatter {
 }
 
 class ServiceShopDateTimeFormatter {
-  /// Format date string into `dd-MMM-yyyy, HH:mm`
-  /// - If timezone offset (+06:00) আছে → remove করে 6 hours minus করবে
-  /// - If ends with Z → 그대로 রাখবে
   static String formatDateTime(String? dateStr) {
     if (dateStr == null || dateStr.isEmpty) return "";
 

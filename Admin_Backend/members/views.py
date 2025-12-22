@@ -8,7 +8,7 @@ from .models import *
 from .serializers import *
 import pandas as pd
 import time
-
+import pytz
 from django.http import JsonResponse,HttpResponse
 from django.template.loader import render_to_string
 from django.views.decorators.csrf import csrf_exempt
@@ -29,6 +29,9 @@ from django.db.models.functions import TruncDate,TruncMonth,Coalesce
 from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
 
+
+# bd_timezone = pytz.timezone("Asia/Dhaka") 
+current_bd_time = timezone.localtime(timezone.now()) + timedelta(hours=6)
 
 def normalize_datetime(dt):
     """
@@ -93,11 +96,29 @@ class UserListCreateView(ListCreateAPIView):
     serializer_class = UserModelSerializer
 
 
+
+
 class CatAPIView(APIView):
     def get(self, request):
-        cat = Cat.objects.all()  # Query all products
+        # Base queryset
+        cat = Cat.objects.all()
+
+        # Search by cat_name
+        search = request.GET.get('search', None)
+        if search:
+            cat = cat.filter(cat_name__icontains=search)
+
+        # Sort logic
+        sort_by = request.GET.get('sort', None)
+        if sort_by in ['status', 'yes_service', 'yes_shop']:
+            # Boolean fields → filter only 1 (True)
+            cat = cat.filter(**{sort_by: 1})
+        elif sort_by in ['user_count', 'cat_used']:
+            # Integer fields → descending order
+            cat = cat.order_by(f'-{sort_by}')
+
         serializer = CatModelSerializer(cat, many=True)
-        return Response(serializer.data)  # Return serialized data
+        return Response(serializer.data)
 
     def post(self, request):
         serializer = CatModelSerializer(data=request.data)
@@ -105,6 +126,7 @@ class CatAPIView(APIView):
             serializer.save()
             return Response(serializer.data, status=201)
         return Response(serializer.errors, status=400)
+
 
 class CountAPIView(APIView):
     def get(self, request):
@@ -204,20 +226,27 @@ def upload_excel(request):
             name = row.get("name", "").strip()
             phone = row.get("phone", "")
             cat_id = row.get("cat_id", None)
-            location = row.get("location", "").strip()
-            photo = row.get("photo", "").strip()
+            # location = row.get("location", "").strip()
+            # photo = row.get("photo", "").strip()
 
             # Skip if name or phone is missing
             if not name or not phone:
                 continue
 
             # Check if phone exists in Reg table
-            reg, created = Reg.objects.get_or_create(phone=phone, defaults={"name": name})
-            if created:
-                # If new record, set the default password and created_date
-                reg.password = "12345"
-                reg.save()
+            # reg, created = Reg.objects.get_or_create(phone=phone, defaults={"name": name})
+            # if created:
+            #     # If new record, set the default password and created_date
+            #     reg.password = "12345"
+            #     reg.secret_number ="1122"
+            #     reg.created_date = timezone.now()
+            #     reg.save()
 
+            reg, created = Reg.objects.get_or_create(phone='0'+str(phone), defaults={ "name": name, "password": "12345", "secret_number": "1122", "created_date": current_bd_time }) 
+
+            if not created and reg.created_date is None: 
+                reg.created_date = current_bd_time
+                reg.save()
             # Find the Cat by ID
             try:
                 cat = Cat.objects.get(cat_id=cat_id)
@@ -225,20 +254,28 @@ def upload_excel(request):
                 cat = None
 
             # Insert data into Users table
-            Users.objects.create(
-                reg=reg,
-                cat=cat,
-                name=name,
-                phone=phone,
-                location=location,
-                photo=photo,
-                description="",
-                user_shared=0,
-                user_viewed=0,
-                user_called=0,
-                user_total_post=0,
-                user_logged_date=None
-            )
+            Users.objects.create( 
+                reg_id=reg.reg_id, 
+                cat=cat, name=name, 
+                phone='0' + str(phone), 
+                location='', 
+                photo='', 
+                description='', 
+                user_type='FREE', 
+                status=True, 
+                user_shared=0, 
+                user_viewed=0, 
+                user_called=0, 
+                user_total_post=0, 
+                user_logged_date=None, 
+                call_status='active', 
+                nid='', 
+                tin='', 
+                self_referral_id='', 
+                reg_referral_id='', 
+                email='', 
+                is_active=1, 
+                deactivated_at=None )
 
         # Clean up uploaded file
         fs.delete(filename)
@@ -536,7 +573,14 @@ def get_users(request):
 
         # Search by user_id
         if search:
-            users = users.filter(user_id=search)
+            # users = users.filter(user_id=search)
+            users = users.filter(
+                Q(user_id__icontains=search) |
+                Q(phone__icontains=search) |
+                Q(name__icontains=search) |
+                Q(user_viewed__icontains=search) |
+                Q(cat__cat_name__icontains=search)
+            )
             if not users.exists():
                 return JsonResponse({'error': 'User not found'}, status=404)
 
@@ -1293,3 +1337,78 @@ class CreateSubscribersView(APIView):
             "summary": summary,
             "new_subscribers": serializer.data
         }, status=status.HTTP_201_CREATED)
+
+
+class TermPolicyAPIView(APIView):
+    # here I get and post the data collector instruction
+    def get(self, request):
+        """
+        GET → term_id=2 এর description দেখাবে
+        """
+        try:
+            term = TermPolicy.objects.get(term_id=3)
+            return Response({"term_id": term.term_id, "description": term.des}, status=status.HTTP_200_OK)
+        except TermPolicy.DoesNotExist:
+            return Response({"error": "TermPolicy with id=3 not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    def post(self, request):
+        """
+        POST → term_id=2 এর description update করবে
+        Body: { "description": "new text here" }
+        """
+        try:
+            term = TermPolicy.objects.get(term_id=3)
+            new_des = request.data.get("description", None)
+            if new_des:
+                term.des = new_des
+                term.save()
+                return Response({"term_id": term.term_id, "description": term.des}, status=status.HTTP_200_OK)
+            else:
+                return Response({"error": "description field required"}, status=status.HTTP_400_BAD_REQUEST)
+        except TermPolicy.DoesNotExist:
+            return Response({"error": "TermPolicy with id=3 not found"}, status=status.HTTP_404_NOT_FOUND)
+
+
+
+@csrf_exempt
+def toggle_subscriber(request, sub_id):
+    if request.method != "POST":
+        return JsonResponse({"error": "Only POST allowed"}, status=405)
+
+    try:
+        subscriber = Subscribers.objects.get(sub_id=sub_id)
+
+        if subscriber.type.lower() == "unpaid":
+            # Toggle to paid
+            subscriber.type = "paid"
+
+            # একবারই BD time নাও
+            bd_tz = pytz.timezone("Asia/Dhaka")
+            bd_time = timezone.now().astimezone(bd_tz)
+
+            # last_pay এ datetime save করো
+            subscriber.last_pay = bd_time
+
+            # একই bd_time কে string করে payment_history তে prepend করো
+            bd_time_str = bd_time.strftime("%Y-%m-%d %H:%M:%S")
+            if subscriber.payment_history:
+                subscriber.payment_history = f"{bd_time_str}, {subscriber.payment_history}"
+            else:
+                subscriber.payment_history = bd_time_str
+
+        else:
+            # Toggle to unpaid
+            subscriber.type = "unpaid"
+            subscriber.last_pay = None
+
+        subscriber.save()
+
+        return JsonResponse({
+            "sub_id": subscriber.sub_id,
+            "type": subscriber.type,
+            "last_pay": subscriber.last_pay.strftime("%Y-%m-%d %H:%M:%S") if subscriber.last_pay else None,
+            "payment_history": subscriber.payment_history
+        }, status=200)
+
+    except Subscribers.DoesNotExist:
+        return JsonResponse({"error": "Subscriber not found"}, status=404)

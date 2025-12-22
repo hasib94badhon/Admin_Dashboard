@@ -11,7 +11,7 @@ import 'package:flutter_web_dashboard/pages/referral/referral.dart';
 import 'package:flutter_web_dashboard/pages/deactivation/deactivation.dart';
 import 'package:flutter_web_dashboard/pages/service/service.dart';
 import 'package:flutter_web_dashboard/pages/shop/shop.dart';
-import 'package:flutter_web_dashboard/pages/location/location.dart';
+import 'package:flutter_web_dashboard/pages/dataterms/terms.dart';
 
 Route<dynamic> generateRoute(RouteSettings settings) {
   switch (settings.name) {
@@ -37,6 +37,8 @@ Route<dynamic> generateRoute(RouteSettings settings) {
       return _getPageRoute(const ShopPage());
     case subscriberPageRoute:
       return _getPageRoute(const SubscriberPage());
+    case termsPageRoute:
+      return _getPageRoute(const TermsPage());
     default:
       return _getPageRoute(const OverviewPage());
   }

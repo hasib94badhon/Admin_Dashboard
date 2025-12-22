@@ -153,7 +153,7 @@ class SubscriberSerializer(serializers.ModelSerializer):
         model = Subscribers
         fields = [
             "sub_id", "user_id", "user_name", "phone", "category",
-            "service_id", "shop_id", "type", "last_pay", "location_address"
+            "service_id", "shop_id", "type", "last_pay", "payment_history","location_address"
         ]
 
     def get_user_name(self, obj):

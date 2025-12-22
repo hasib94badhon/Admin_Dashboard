@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_web_dashboard/config.dart'; // এখানে $host আছে
 import 'package:http/http.dart' as http;
 import 'package:data_table_2/data_table_2.dart';
@@ -50,6 +51,64 @@ class _SubscriberPageState extends State<SubscriberPage> {
       });
     }
     setState(() => isLoading = false);
+  }
+
+  Future<void> toggleSubscriber(int subId, String currentType) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Confirm Action"),
+        content: Text(
+          currentType == "paid"
+              ? "Do you want to mark this subscriber as Unpaid?"
+              : "Do you want to mark this subscriber as Paid?",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text("Cancel"),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text("Confirm"),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return; // Cancel করলে কিছু হবে না
+
+    final url = Uri.parse("$host/api/toggle-subscriber/$subId/");
+    final response = await http.post(url);
+
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Subscriber ${data['sub_id']} is now ${data['type']}"),
+          backgroundColor: Colors.green,
+        ),
+      );
+
+      fetchSubscribers();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Failed to toggle subscriber"),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  void _copyRowData(Map<String, dynamic> row) {
+    final buffer = StringBuffer();
+    row.forEach((key, value) {
+      buffer.writeln("$key: ${value ?? ''}");
+    });
+
+    Clipboard.setData(ClipboardData(text: buffer.toString()));
   }
 
   @override
@@ -242,6 +301,12 @@ class _SubscriberPageState extends State<SubscriberPage> {
                 DataColumn(
                     label: Text("Location",
                         style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(
+                    label: Text("Action",
+                        style: TextStyle(fontWeight: FontWeight.bold))),
+                DataColumn(
+                    label: Text("Copy Data",
+                        style: TextStyle(fontWeight: FontWeight.bold))),
               ],
               rows: List<DataRow>.generate(
                 subscribers.length,
@@ -267,8 +332,25 @@ class _SubscriberPageState extends State<SubscriberPage> {
                             color: subscriberColor,
                             fontWeight: FontWeight.bold),
                       )),
-                      DataCell(_buildCellText(s['last_pay'] ?? "")),
+                      DataCell(_buildCellText(
+                          TimeFormatter.formatBdTime(s['last_pay'] ?? ""))),
                       DataCell(_buildCellText(s['location_address'] ?? "")),
+                      DataCell(
+                        ElevatedButton(
+                          onPressed: () =>
+                              toggleSubscriber(s['sub_id'], s['type']),
+                          child: Text(
+                            s['type'] == "paid" ? "Mark Unpaid" : "Mark Paid",
+                          ),
+                        ),
+                      ),
+                      DataCell(
+                        IconButton(
+                          icon: const Icon(Icons.copy),
+                          tooltip: 'Copy Row Data',
+                          onPressed: () => _copyRowData(s),
+                        ),
+                      ),
                     ],
                   );
                 },

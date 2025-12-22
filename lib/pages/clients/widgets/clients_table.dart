@@ -185,7 +185,7 @@ class _ClientstableState extends State<Clientstable> {
                       }
                     },
                     decoration: InputDecoration(
-                      hintText: "Search by UserID",
+                      hintText: "Search by UserID / Phone / Name / Category",
                       filled: true,
                       fillColor: Colors.blue,
                       prefixIcon: const Icon(Icons.search, color: Colors.black),

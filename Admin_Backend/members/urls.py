@@ -28,7 +28,9 @@ urlpatterns = [
     path('api/service-users/', ServiceUserList.as_view(), name='service-users'),
     path('api/shop-users/', ShopUserList.as_view(), name='shop-users'),
     path('api/subscriber-users/', SubscriberListView.as_view(), name='subscriber-users'),
-    path('api/create-subscribers/', CreateSubscribersView.as_view(), name='create-subscribers')
+    path('api/create-subscribers/', CreateSubscribersView.as_view(), name='create-subscribers'),
+    path('api/term-policy/', TermPolicyAPIView.as_view(), name='term-policy'),
+    path('api/toggle-subscriber/<int:sub_id>/', toggle_subscriber, name='toggle-subscriber'),
 
 
 ]
