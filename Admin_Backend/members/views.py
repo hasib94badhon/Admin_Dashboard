@@ -22,7 +22,7 @@ from unicodedata import normalize
 from django.contrib.auth import authenticate
 from rest_framework.decorators import api_view
 from django.utils import timezone
-from django.utils.timezone import now,localdate
+from django.utils.timezone import now,localdate,make_aware
 from django.db.models import Count,Q, F, OuterRef, Subquery, IntegerField, Value,Sum,Case, When, Value,Exists
 from datetime import timedelta, datetime
 from django.db.models.functions import TruncDate,TruncMonth,Coalesce
@@ -687,13 +687,15 @@ def download_user(request):
 
 @api_view(['GET'])
 def dashboard_stats(request):
-    today_start = datetime.combine(now().date(), datetime.min.time()).replace(tzinfo=timezone.utc)
-    today_end = datetime.combine(now().date(), datetime.max.time()).replace(tzinfo=timezone.utc)
+    # today_start = datetime.combine(now().date(), datetime.min.time()).replace(tzinfo=timezone.utc)
+    # today_end = datetime.combine(now().date(), datetime.max.time()).replace(tzinfo=timezone.utc)
+    today_start = make_aware(datetime.combine(now().date(), datetime.min.time())) 
+    today_end = make_aware(datetime.combine(now().date(), datetime.max.time()))
 
     last7_start = today_start - timedelta(days=7)
     last30_start = today_start - timedelta(days=30)
 
-    # Registrations grouped by day (last 30 days) – ORM version (তুমি চাইলে বাদ দিতে পারো)
+#     # Registrations grouped by day (last 30 days) – ORM version (তুমি চাইলে বাদ দিতে পারো)
     reg_counts = (
         Reg.objects.filter(created_date__range=(last30_start, today_end))
         .extra(select={'day': "DATE(created_date)"})
@@ -701,31 +703,61 @@ def dashboard_stats(request):
         .annotate(count=Count('reg_id'))
         .order_by('day')
     )
+#     reg_counts_day = (
+#     Reg.objects
+#     .annotate(day=TruncDate('created_date', tzinfo=None))  # timezone conversion বন্ধ
+#     .values('day')
+#     .annotate(count=Count('reg_id'))
+#     .order_by('-day')
+# )
+#     registrations_day = [
+#     {"day": row["day"].isoformat(), "count": row["count"]}
+#     for row in reg_counts_day
+# ]
+
+#     # Month-wise registrations 
+#     reg_counts_month = (
+#         Reg.objects
+#         .annotate(month=TruncMonth('created_date', tzinfo=None))  # timezone conversion বন্ধ
+#         .values('month')
+#         .annotate(count=Count('reg_id'))
+#         .order_by('-month')
+#     )
+    
+#     registrations_month = [
+#     {"month": row["month"].strftime("%Y-%m"), "count": row["count"]}
+#     for row in reg_counts_month
+# ]
+
+
+
+
     reg_counts_day = (
     Reg.objects
-    .annotate(day=TruncDate('created_date', tzinfo=None))  # timezone conversion বন্ধ
+    .annotate(day=TruncDate('created_date'))
     .values('day')
     .annotate(count=Count('reg_id'))
     .order_by('-day')
 )
+
     registrations_day = [
     {"day": row["day"].isoformat(), "count": row["count"]}
     for row in reg_counts_day
 ]
 
-    # Month-wise registrations 
     reg_counts_month = (
-        Reg.objects
-        .annotate(month=TruncMonth('created_date', tzinfo=None))  # timezone conversion বন্ধ
-        .values('month')
-        .annotate(count=Count('reg_id'))
-        .order_by('-month')
-    )
-    
+    Reg.objects
+    .annotate(month=TruncMonth('created_date'))
+    .values('month')
+    .annotate(count=Count('reg_id'))
+    .order_by('-month')
+)
+
     registrations_month = [
     {"month": row["month"].strftime("%Y-%m"), "count": row["count"]}
     for row in reg_counts_month
 ]
+
 
 
     # Posts today and last 7/30 days
