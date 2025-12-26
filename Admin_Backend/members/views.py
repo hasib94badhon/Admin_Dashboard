@@ -202,6 +202,81 @@ def insert_cat(request):
         return JsonResponse({"error": "Invalid request method"}, status=405)
 
 
+# @csrf_exempt
+# def upload_excel(request):
+#     if request.method != "POST":
+#         return JsonResponse({"error": "Only POST requests are allowed"}, status=405)
+
+#     if "file" not in request.FILES:
+#         return JsonResponse({"error": "No file provided"}, status=400)
+
+#     file = request.FILES["file"]
+
+#     try:
+#         # Save file temporarily
+#         fs = FileSystemStorage()
+#         filename = fs.save(file.name, file)
+#         filepath = fs.path(filename)
+
+#         # Read Excel file
+#         data = pd.read_excel(filepath, sheet_name="data")
+        
+#         # Process each row in the Excel file
+#         for index, row in data.iterrows():
+#             name = row.get("name", "").strip()
+#             phone = row.get("phone", "")
+#             cat_id = row.get("cat_id", None)
+#             # location = row.get("location", "").strip()
+#             # photo = row.get("photo", "").strip()
+
+#             # Skip if name or phone is missing
+#             if not name or not phone:
+#                 continue
+
+          
+
+#             reg, created = Reg.objects.get_or_create(phone='0'+str(phone), defaults={ "name": name, "password": "12345", "secret_number": "1122", "created_date": current_bd_time }) 
+
+#             if not created and reg.created_date is None: 
+#                 reg.created_date = current_bd_time
+#                 reg.save()
+#             # Find the Cat by ID
+#             try:
+#                 cat = Cat.objects.get(cat_id=cat_id)
+#             except Cat.DoesNotExist:
+#                 cat = None
+
+#             # Insert data into Users table
+#             Users.objects.create( 
+#                 reg_id=reg.reg_id, 
+#                 cat=cat, name=name, 
+#                 phone='0' + str(phone), 
+#                 location='', 
+#                 photo='', 
+#                 description='', 
+#                 user_type='FREE', 
+#                 status=True, 
+#                 user_shared=0, 
+#                 user_viewed=0, 
+#                 user_called=0, 
+#                 user_total_post=0, 
+#                 user_logged_date= current_bd_time, 
+#                 call_status='active', 
+#                 nid='', 
+#                 tin='', 
+#                 self_referral_id='', 
+#                 reg_referral_id='0', 
+#                 email='', 
+#                 is_active=1, 
+#                 deactivated_at=None )
+
+#         # Clean up uploaded file
+#         fs.delete(filename)
+
+#         return JsonResponse({"message": "File processed successfully"}, status=201)
+#     except Exception as e:
+#         return JsonResponse({"error": str(e)}, status=500)
+
 @csrf_exempt
 def upload_excel(request):
     if request.method != "POST":
@@ -213,76 +288,107 @@ def upload_excel(request):
     file = request.FILES["file"]
 
     try:
-        # Save file temporarily
         fs = FileSystemStorage()
         filename = fs.save(file.name, file)
         filepath = fs.path(filename)
 
-        # Read Excel file
         data = pd.read_excel(filepath, sheet_name="data")
-        
-        # Process each row in the Excel file
-        for index, row in data.iterrows():
-            name = row.get("name", "").strip()
-            phone = row.get("phone", "")
-            cat_id = row.get("cat_id", None)
-            # location = row.get("location", "").strip()
-            # photo = row.get("photo", "").strip()
 
-            # Skip if name or phone is missing
+        for index, row in data.iterrows():
+            name = str(row.get("name", "")).strip()
+            phone = str(row.get("phone", "")).strip()
+            cat_id = row.get("cat_id", None)
+
             if not name or not phone:
                 continue
 
-            # Check if phone exists in Reg table
-            # reg, created = Reg.objects.get_or_create(phone=phone, defaults={"name": name})
-            # if created:
-            #     # If new record, set the default password and created_date
-            #     reg.password = "12345"
-            #     reg.secret_number ="1122"
-            #     reg.created_date = timezone.now()
-            #     reg.save()
-
-            reg, created = Reg.objects.get_or_create(phone='0'+str(phone), defaults={ "name": name, "password": "12345", "secret_number": "1122", "created_date": current_bd_time }) 
-
-            if not created and reg.created_date is None: 
+            # === Insert into Reg ===
+            reg, created = Reg.objects.get_or_create(
+                phone="0" + phone,
+                defaults={
+                    "name": name,
+                    "password": "12345",
+                    "secret_number": "1122",
+                    "created_date": current_bd_time,
+                },
+            )
+            if not created and reg.created_date is None:
                 reg.created_date = current_bd_time
                 reg.save()
-            # Find the Cat by ID
+
+            # === Find Cat ===
             try:
                 cat = Cat.objects.get(cat_id=cat_id)
             except Cat.DoesNotExist:
                 cat = None
 
-            # Insert data into Users table
-            Users.objects.create( 
-                reg_id=reg.reg_id, 
-                cat=cat, name=name, 
-                phone='0' + str(phone), 
-                location='', 
-                photo='', 
-                description='', 
-                user_type='FREE', 
-                status=True, 
-                user_shared=0, 
-                user_viewed=0, 
-                user_called=0, 
-                user_total_post=0, 
-                user_logged_date=None, 
-                call_status='active', 
-                nid='', 
-                tin='', 
-                self_referral_id='', 
-                reg_referral_id='', 
-                email='', 
-                is_active=1, 
-                deactivated_at=None )
+            # === Insert into Users ===
+            user = Users.objects.create(
+                reg_id=reg.reg_id,
+                cat=cat,
+                name=name,
+                phone="0" + phone,
+                location="",
+                photo="",
+                description="",
+                user_type="FREE",
+                status=True,
+                user_shared=0,
+                user_viewed=0,
+                user_called=0,
+                user_total_post=0,
+                user_logged_date=current_bd_time,
+                call_status="active",
+                nid="",
+                tin="",
+                self_referral_id="",
+                reg_referral_id="0",
+                email="",
+                is_active=1,
+                deactivated_at=None,
+            )
 
-        # Clean up uploaded file
+            # === Insert into Service if yes_service == 1 ===
+            if cat and cat.yes_service == 1:
+                exists_service = Service.objects.filter(phone=phone).exists()
+                if not exists_service:
+                    Service.objects.create(
+                        cat_id=cat,
+                        name=name,
+                        location="",
+                        description="",
+                        photo="",
+                        phone=phone,
+                        date_time=current_bd_time,
+                        user_id=user,
+                    )
+
+            # === Insert into Shop if yes_shop == 1 ===
+            if cat and cat.yes_shop == 1:
+                exists_shop = Shop.objects.filter(phone=phone).exists()
+                if not exists_shop:
+                    Shop.objects.create(
+                        cat_id=cat,
+                        name=name,
+                        location="",
+                        description="",
+                        photo="",
+                        phone=phone,
+                        date_time=current_bd_time,
+                        user_id=user,
+                    )
+
         fs.delete(filename)
-
         return JsonResponse({"message": "File processed successfully"}, status=201)
+
     except Exception as e:
         return JsonResponse({"error": str(e)}, status=500)
+
+
+
+
+
+
 
 
 
