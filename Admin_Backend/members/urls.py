@@ -31,6 +31,10 @@ urlpatterns = [
     path('api/create-subscribers/', CreateSubscribersView.as_view(), name='create-subscribers'),
     path('api/term-policy/', TermPolicyAPIView.as_view(), name='term-policy'),
     path('api/toggle-subscriber/<int:sub_id>/', toggle_subscriber, name='toggle-subscriber'),
+    path('api/overview-stats/', overview_stats, name='overview-stats'),
+    path('api/app-status/', app_status, name='app-status'),
+    path('api/insert-topic/', insert_des_cat, name='insert-topic'),
+    path('api/reactions/', reactions, name='reactions'),
 
 
 ]

@@ -751,14 +751,17 @@ def download_user(request):
 
         user_data = {
             'user_id': user.user_id,
+            'receipt_no': f"ARAM-{user.user_id:06d}",
             'name': user.name,
             'phone': user.phone,
             'user_type': user.user_type,
+            'user_type_label': 'PAID' if user.user_type else 'FREE',
             'status': user.status,
+            'status_label': 'Active' if user.status else 'Inactive',
             'location': user.location,
             'user_total_post': user.user_total_post,
             'user_logged_date': user.user_logged_date,
-            'now': now,  # Include generated time
+            'now': now,
         }
 
         try:
@@ -1508,6 +1511,46 @@ class TermPolicyAPIView(APIView):
 
 
 
+@api_view(['GET'])
+def overview_stats(request):
+    """
+    Single endpoint for the Overview/Dashboard page.
+    Returns summary counts + DesCat breakdown + FbPage count.
+    """
+    total_users         = Users.objects.count()
+    total_cats          = Cat.objects.count()
+    total_services      = Service.objects.count()
+    total_shops         = Shop.objects.count()
+    total_fb_pages      = FbPage.objects.count()
+    total_registrations = Reg.objects.count()
+    total_subscribers   = Subscribers.objects.count()
+    paid_subscribers    = Subscribers.objects.filter(type__iexact='paid').count()
+    unpaid_subscribers  = Subscribers.objects.filter(type__iexact='unpaid').count()
+    total_referrals     = UserReferrals.objects.count()
+
+    # Count of Description records per DesCat, sorted by most used
+    des_cat_counts = list(
+        DesCat.objects
+        .annotate(count=Count('description'))
+        .order_by('-count')
+        .values('des_cat_id', 'des_cat_name', 'des_cat_status', 'count')
+    )
+
+    return Response({
+        "total_users":         total_users,
+        "total_cats":          total_cats,
+        "total_services":      total_services,
+        "total_shops":         total_shops,
+        "total_fb_pages":      total_fb_pages,
+        "total_registrations": total_registrations,
+        "total_subscribers":   total_subscribers,
+        "paid_subscribers":    paid_subscribers,
+        "unpaid_subscribers":  unpaid_subscribers,
+        "total_referrals":     total_referrals,
+        "des_cat_counts":      des_cat_counts,
+    })
+
+
 @csrf_exempt
 def toggle_subscriber(request, sub_id):
     if request.method != "POST":
@@ -1550,3 +1593,125 @@ def toggle_subscriber(request, sub_id):
 
     except Subscribers.DoesNotExist:
         return JsonResponse({"error": "Subscriber not found"}, status=404)
+
+
+@api_view(['GET'])
+def app_status(request):
+    from datetime import timedelta
+    today = now().date()
+    week_ago  = today - timedelta(days=7)
+    month_ago = today - timedelta(days=30)
+
+    return Response({
+        "content_health": {
+            "active_users":   Users.objects.filter(status=True).count(),
+            "inactive_users": Users.objects.filter(status=False).count(),
+            "active_cats":    Cat.objects.filter(status=True).count(),
+            "inactive_cats":  Cat.objects.filter(status=False).count(),
+            "paid_subs":      Subscribers.objects.filter(type__iexact='paid').count(),
+            "free_subs":      Subscribers.objects.filter(type__iexact='unpaid').count(),
+        },
+        "growth": {
+            "registrations": {
+                "today": Reg.objects.filter(created_date__date=today).count(),
+                "week":  Reg.objects.filter(created_date__date__gte=week_ago).count(),
+                "month": Reg.objects.filter(created_date__date__gte=month_ago).count(),
+            },
+            "services": {
+                "today": Service.objects.filter(date_time__date=today).count(),
+                "week":  Service.objects.filter(date_time__date__gte=week_ago).count(),
+                "month": Service.objects.filter(date_time__date__gte=month_ago).count(),
+            },
+            "shops": {
+                "today": Shop.objects.filter(date_time__date=today).count(),
+                "week":  Shop.objects.filter(date_time__date__gte=week_ago).count(),
+                "month": Shop.objects.filter(date_time__date__gte=month_ago).count(),
+            },
+        },
+    })
+
+
+@api_view(['GET'])
+def reactions(request):
+    tab    = request.GET.get('tab', 'views')
+    search = request.GET.get('search', '').strip()
+    sort   = request.GET.get('sort', 'recent')
+    page   = max(int(request.GET.get('page', 1)), 1)
+    page_size = 25
+    start  = (page - 1) * page_size
+
+    if tab == 'calls':
+        qs = CallList.objects.select_related('call_user', 'user')
+        if search:
+            qs = qs.filter(
+                Q(call_user__name__icontains=search) |
+                Q(user__name__icontains=search)       |
+                Q(call_user__user_id__icontains=search)|
+                Q(user__user_id__icontains=search)
+            )
+        qs = qs.order_by('-call_count' if sort == 'most_count' else '-call_time')
+        total              = qs.count()
+        total_interactions = qs.aggregate(s=Sum('call_count'))['s'] or 0
+        results = [{
+            'id':           c.call_id,
+            'time':         c.call_time,
+            'actor_id':     c.call_user.user_id,
+            'actor_name':   c.call_user.name,
+            'actor_phone':  c.call_user.phone,
+            'target_id':    c.user.user_id,
+            'target_name':  c.user.name,
+            'target_phone': c.user.phone,
+            'count':        c.call_count,
+        } for c in qs[start:start + page_size]]
+
+    else:  # views
+        qs = ViewList.objects.annotate(
+            viewer_name=Subquery(Users.objects.filter(user_id=OuterRef('view_user_id')).values('name')[:1]),
+            viewer_phone=Subquery(Users.objects.filter(user_id=OuterRef('view_user_id')).values('phone')[:1]),
+            target_name=Subquery(Users.objects.filter(user_id=OuterRef('user_id')).values('name')[:1]),
+            target_phone=Subquery(Users.objects.filter(user_id=OuterRef('user_id')).values('phone')[:1]),
+        )
+        if search:
+            qs = qs.filter(
+                Q(viewer_name__icontains=search) |
+                Q(target_name__icontains=search) |
+                Q(view_user_id__icontains=search)|
+                Q(user_id__icontains=search)
+            )
+        qs = qs.order_by('-view_count' if sort == 'most_count' else '-view_time')
+        total              = qs.count()
+        total_interactions = qs.aggregate(s=Sum('view_count'))['s'] or 0
+        results = list(qs[start:start + page_size].values(
+            'view_id', 'view_time', 'view_user_id', 'user_id',
+            'view_count', 'viewer_name', 'viewer_phone', 'target_name', 'target_phone'
+        ))
+        results = [{
+            'id':           r['view_id'],
+            'time':         r['view_time'],
+            'actor_id':     r['view_user_id'],
+            'actor_name':   r['viewer_name'] or '—',
+            'actor_phone':  r['viewer_phone'] or '',
+            'target_id':    r['user_id'],
+            'target_name':  r['target_name'] or '—',
+            'target_phone': r['target_phone'] or '',
+            'count':        r['view_count'],
+        } for r in results]
+
+    return Response({
+        'total':              total,
+        'total_interactions': total_interactions,
+        'page':               page,
+        'has_more':           (start + page_size) < total,
+        'results':            results,
+    })
+
+
+@api_view(['POST'])
+def insert_des_cat(request):
+    des_cat_name = request.data.get('des_cat_name', '').strip()
+    if not des_cat_name:
+        return Response({"error": "des_cat_name is required."}, status=400)
+    if DesCat.objects.filter(des_cat_name__iexact=des_cat_name).exists():
+        return Response({"error": f"Topic '{des_cat_name}' already exists."}, status=409)
+    topic = DesCat.objects.create(des_cat_name=des_cat_name, des_cat_status=1)
+    return Response({"success": True, "des_cat_id": topic.des_cat_id, "des_cat_name": topic.des_cat_name}, status=201)

@@ -1,74 +1,72 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_web_dashboard/constants/controllers.dart';
+import 'package:flutter_web_dashboard/constants/style.dart';
 import 'package:get/get.dart';
-
-import 'widgets/custom_text.dart';
 
 class VertticalMenuItem extends StatelessWidget {
   final String itemName;
   final Function()? onTap;
-  const VertticalMenuItem({Key? key, required this.itemName, this.onTap})
-      : super(key: key);
+  const VertticalMenuItem({super.key, required this.itemName, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => menuController.onHover(itemName),
+      onExit: (_) => menuController.onHover("not hovering"),
+      child: InkWell(
         onTap: onTap,
-        onHover: (value) {
-          value
-              ? menuController.onHover(itemName)
-              : menuController.onHover("not hovering");
-        },
-        child: Obx(() => Container(
-              color: menuController.isHovering(itemName)
-                  ? Colors.red
-                  : Colors.transparent,
-              child: Row(
-                children: [
-                  Visibility(
-                    visible: menuController.isHovering(itemName) ||
-                        menuController.isActive(itemName),
-                    maintainSize: true,
-                    maintainAnimation: true,
-                    maintainState: true,
-                    child: Container(
-                      width: 3,
-                      height: 72,
-                      color: Colors.white,
+        child: Obx(() {
+          final isActive = menuController.isActive(itemName);
+          final isHover = menuController.isHovering(itemName);
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            color: (isActive || isHover) ? sidebarHoverBg : Colors.transparent,
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Top accent bar
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  height: 3,
+                  width: double.infinity,
+                  color: isActive ? accentColor : Colors.transparent,
+                ),
+                const SizedBox(height: 10),
+                Icon(
+                  menuController.returnIconDataFor(itemName),
+                  size: 22,
+                  color: isActive
+                      ? accentColor
+                      : isHover
+                          ? textOnDark
+                          : textOnDarkMuted,
+                ),
+                const SizedBox(height: 6),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Text(
+                    itemName,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                      color: isActive
+                          ? Colors.white
+                          : isHover
+                              ? textOnDark
+                              : textOnDarkMuted,
                     ),
                   ),
-                  Expanded(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-
-                        
-                        Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: menuController.returnIconFor(itemName),
-                        ),
-                        if (!menuController.isActive(itemName))
-                          Flexible(
-                              child: CustomText(
-                            text: itemName,
-                            color: menuController.isHovering(itemName)
-                                ? Colors.red
-                                : Colors.yellow,
-                          ))
-                        else
-                          Flexible(
-                              child: CustomText(
-                            text: itemName,
-                            color: Colors.white,
-                            size: 18,
-                            weight: FontWeight.bold,
-                          ))
-                      ],
-                    ),
-                  ),
-                  
-                ],
-              ),
-            )));
+                ),
+              ],
+            ),
+          );
+        }),
+      ),
+    );
   }
 }

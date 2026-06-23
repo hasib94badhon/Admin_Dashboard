@@ -6,7 +6,6 @@ import 'package:get/get.dart';
 class MenuController extends GetxController {
   static MenuController instance = Get.find();
   var activeItem = overviewPageDisplayName.obs;
-
   var hoverItem = "".obs;
 
   changeActiveItemTo(String itemName) {
@@ -18,46 +17,33 @@ class MenuController extends GetxController {
   }
 
   isHovering(String itemName) => hoverItem.value == itemName;
-
   isActive(String itemName) => activeItem.value == itemName;
 
-  Widget returnIconFor(String itemName) {
+  IconData returnIconDataFor(String itemName) {
     switch (itemName) {
-      case overviewPageDisplayName:
-        return _customIcon(Icons.dashboard, itemName);
-      case driversPageDisplayName:
-        return _customIcon(Icons.category, itemName);
-      case clientsPageDisplayName:
-        return _customIcon(Icons.people_alt_outlined, itemName);
-      case InsertPageDisplayName:
-        return _customIcon(Icons.import_export, itemName);
-      case AppstatusPageDisplayName:
-        return _customIcon(Icons.stacked_line_chart_rounded, itemName);
-      case staffAdminPageDisplayName:
-        return _customIcon(Icons.admin_panel_settings, itemName);
-      case subscriberPageDisplayName:
-        return _customIcon(Icons.subscriptions, itemName);
-      case referralPageDisplayName:
-        return _customIcon(Icons.group_add, itemName);
-      case deactivationPageDisplayName:
-        return _customIcon(Icons.person_off, itemName);
-      case servicePageDisplayName:
-        return _customIcon(Icons.miscellaneous_services, itemName);
-      case shopPageDisplayName:
-        return _customIcon(Icons.storefront, itemName);
-      case authenticationPageDisplayName:
-        return _customIcon(Icons.exit_to_app, itemName);
-      default:
-        return _customIcon(Icons.exit_to_app, itemName);
+      case overviewPageDisplayName:       return Icons.dashboard_rounded;
+      case driversPageDisplayName:        return Icons.category_rounded;
+      case clientsPageDisplayName:        return Icons.people_rounded;
+      case InsertPageDisplayName:         return Icons.upload_file_rounded;
+      case AppstatusPageDisplayName:      return Icons.bar_chart_rounded;
+      case staffAdminPageDisplayName:     return Icons.admin_panel_settings_rounded;
+      case referralPageDisplayName:       return Icons.group_add_rounded;
+      case deactivationPageDisplayName:   return Icons.person_off_rounded;
+      case servicePageDisplayName:        return Icons.miscellaneous_services_rounded;
+      case shopPageDisplayName:           return Icons.storefront_rounded;
+      case subscriberPageDisplayName:     return Icons.subscriptions_rounded;
+      case authenticationPageDisplayName: return Icons.logout_rounded;
+      case termsPageDisplayName:          return Icons.description_rounded;
+      default:                            return Icons.circle_outlined;
     }
   }
 
-  Widget _customIcon(IconData icon, String itemName) {
-    if (isActive(itemName)) return Icon(icon, size: 22, color: dark);
-
+  // Kept for backward compatibility with existing pages
+  Widget returnIconFor(String itemName) {
     return Icon(
-      icon,
-      color: isHovering(itemName) ? dark : lightGrey,
+      returnIconDataFor(itemName),
+      size: 20,
+      color: isActive(itemName) ? accentColor : isHovering(itemName) ? textOnDark : textOnDarkMuted,
     );
   }
 }

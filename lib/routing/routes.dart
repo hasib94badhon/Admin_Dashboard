@@ -33,6 +33,9 @@ const shopPageRoute = "/shop";
 const subscriberPageDisplayName = "Subscribers";
 const subscriberPageRoute = "/subscribers";
 
+const reactionsPageDisplayName = "Reactions";
+const reactionsPageRoute = "/reactions";
+
 const authenticationPageDisplayName = "Log out";
 const authenticationPageRoute = "/auth";
 const termsPageDisplayName = "Data Collector Instructions";
@@ -57,6 +60,7 @@ List<MenuItem> sideMenuItemRoutes = [
   MenuItem(servicePageDisplayName, servicePageRoute),
   MenuItem(shopPageDisplayName, shopPageRoute),
   MenuItem(subscriberPageDisplayName, subscriberPageRoute),
+  MenuItem(reactionsPageDisplayName, reactionsPageRoute),
   // MenuItem(authenticationPageDisplayName, authenticationPageRoute),
   MenuItem(termsPageDisplayName, termsPageRoute),
 ];

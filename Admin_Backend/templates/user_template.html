@@ -1,116 +1,434 @@
-<!-- <!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>User Information</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            padding: 20px;
-            line-height: 1.6;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 20px;
-        }
-        th, td {
-            padding: 10px;
-            text-align: left;
-            border: 1px solid #ddd;
-        }
-        th {
-            background-color: #f4f4f4;
-        }
-        .title {
-            margin-bottom: 20px;
-        }
-    </style>
-</head>
-<body>
-    <h1 class="title">User Information</h1>
-    <table>
-        <thead>
-            <tr>
-                <th>User ID</th>
-                <th>Name</th>
-                <th>Phone</th>
-                <th>User Type</th>
-                <th>Status</th>
-                <th>Location</th>
-                <th>Total Posts</th>
-                <th>Logged Date</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td>{{ user.user_id }}</td>
-                <td>{{ user.name }}</td>
-                <td>{{ user.phone }}</td>
-                <td>{{ user.user_type }}</td>
-                <td>{{ user.status }}</td>
-                <td>{{ user.location }}</td>
-                <td>{{ user.user_total_post }}</td>
-                <td>{{ user.user_logged_date }}</td>
-            </tr>
-        </tbody>
-    </table>
-</body>
-</html> -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Information</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 20px;
-            padding: 0;
-            line-height: 1.6;
-            color: #333;
-        }
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 20px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            background-color: #f9f9f9;
-        }
-        h1 {
-            text-align: center;
-            color: #555;
-            margin-bottom: 20px;
-        }
-        p {
-            margin: 10px 0;
-        }
-        .label {
-            font-weight: bold;
-        }
-        .divider {
-            margin: 20px 0;
-            border-top: 1px solid #ddd;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>AaramBD – Subscription Receipt {{ user.receipt_no }}</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 0;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 13px;
+      color: #1e293b;
+      background: #ffffff;
+    }
+
+    /* ── Header ── */
+    .header {
+      background-color: #0f172a;
+      padding: 32px 48px 28px;
+    }
+
+    .header-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+
+    .brand-name {
+      font-size: 28px;
+      font-weight: 900;
+      color: #6366f1;
+      letter-spacing: -0.5px;
+    }
+
+    .brand-tagline {
+      font-size: 11px;
+      color: #94a3b8;
+      margin-top: 4px;
+      letter-spacing: 0.3px;
+    }
+
+    .brand-url {
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 2px;
+    }
+
+    .receipt-label {
+      text-align: right;
+    }
+
+    .receipt-label .title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #e2e8f0;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .receipt-label .receipt-no {
+      font-size: 13px;
+      color: #6366f1;
+      font-weight: 700;
+      margin-top: 6px;
+    }
+
+    .receipt-label .receipt-date {
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 4px;
+    }
+
+    /* ── Accent bar ── */
+    .accent-bar {
+      height: 4px;
+      background: linear-gradient(to right, #6366f1, #818cf8, #0f172a);
+    }
+
+    /* ── Body ── */
+    .body {
+      padding: 40px 48px;
+    }
+
+    /* ── Status banner ── */
+    .status-banner {
+      border-radius: 8px;
+      padding: 16px 24px;
+      margin-bottom: 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .status-banner.paid {
+      background-color: #eff6ff;
+      border-left: 4px solid #6366f1;
+    }
+
+    .status-banner.free {
+      background-color: #f8fafc;
+      border-left: 4px solid #94a3b8;
+    }
+
+    .status-banner .greeting {
+      font-size: 15px;
+      font-weight: 700;
+      color: #1e293b;
+    }
+
+    .status-banner .sub-text {
+      font-size: 12px;
+      color: #64748b;
+      margin-top: 4px;
+    }
+
+    .plan-badge {
+      display: inline-block;
+      padding: 6px 20px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .plan-badge.paid {
+      background-color: #6366f1;
+      color: #ffffff;
+    }
+
+    .plan-badge.free {
+      background-color: #e2e8f0;
+      color: #64748b;
+    }
+
+    /* ── Section ── */
+    .section {
+      margin-bottom: 28px;
+    }
+
+    .section-title {
+      font-size: 10px;
+      font-weight: 700;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 12px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    /* ── Info grid ── */
+    .info-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .info-table td {
+      padding: 9px 0;
+      vertical-align: top;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .info-table td.label {
+      color: #64748b;
+      font-size: 12px;
+      width: 38%;
+      padding-right: 16px;
+    }
+
+    .info-table td.value {
+      color: #1e293b;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    /* ── Two-column layout ── */
+    .two-col {
+      display: table;
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 16px 0;
+    }
+
+    .col {
+      display: table-cell;
+      width: 50%;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 16px 20px;
+      vertical-align: top;
+    }
+
+    .col-label {
+      font-size: 11px;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+
+    .col-value {
+      font-size: 20px;
+      font-weight: 800;
+      color: #1e293b;
+    }
+
+    .col-value.accent {
+      color: #6366f1;
+    }
+
+    /* ── Active status pill ── */
+    .status-pill {
+      display: inline-block;
+      padding: 3px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .status-pill.active {
+      background-color: #dcfce7;
+      color: #16a34a;
+    }
+
+    .status-pill.inactive {
+      background-color: #fee2e2;
+      color: #dc2626;
+    }
+
+    /* ── Thank-you block ── */
+    .thankyou {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 20px 24px;
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .thankyou .headline {
+      font-size: 15px;
+      font-weight: 700;
+      color: #1e293b;
+      margin-bottom: 6px;
+    }
+
+    .thankyou .body-text {
+      font-size: 12px;
+      color: #64748b;
+      line-height: 1.6;
+    }
+
+    /* ── Footer ── */
+    .footer {
+      background-color: #0f172a;
+      padding: 20px 48px;
+    }
+
+    .footer-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .footer-brand {
+      font-size: 14px;
+      font-weight: 800;
+      color: #6366f1;
+    }
+
+    .footer-contact {
+      font-size: 10px;
+      color: #64748b;
+      line-height: 1.8;
+      text-align: center;
+    }
+
+    .footer-note {
+      font-size: 10px;
+      color: #475569;
+      text-align: right;
+    }
+
+    /* ── Divider ── */
+    .divider {
+      border: none;
+      border-top: 1px solid #e2e8f0;
+      margin: 24px 0;
+    }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <h1>{{ user.name }} Information</h1>
-        <p><span class="label">User ID:</span> {{ user.user_id }}</p>
-        <p><span class="label">Name:</span> {{ user.name }}</p>
-        <p><span class="label">Phone:</span> {{ user.phone }}</p>
-        <p><span class="label">User Type:</span> {{ user.user_type }}</p>
-        <p><span class="label">Status:</span> {{ user.status }}</p>
-        <p><span class="label">Location:</span> {{ user.location }}</p>
-        <p><span class="label">Total Posts:</span> {{ user.user_total_post }}</p>
-        <p><span class="label">Logged Date:</span> {{ user.user_logged_date }}</p>
 
-        <div class="divider"></div>
-
-        <p style="text-align: center;">Generated on: {{ user.now }}</p>
+  <!-- Header -->
+  <div class="header">
+    <div class="header-inner">
+      <div>
+        <div class="brand-name">AaramBD</div>
+        <div class="brand-tagline">Bangladesh's Service Directory Platform</div>
+        <div class="brand-url">www.aarambd.com</div>
+      </div>
+      <div class="receipt-label">
+        <div class="title">Subscription Receipt</div>
+        <div class="receipt-no">{{ user.receipt_no }}</div>
+        <div class="receipt-date">Generated: {{ user.now }}</div>
+      </div>
     </div>
+  </div>
+
+  <div class="accent-bar"></div>
+
+  <!-- Body -->
+  <div class="body">
+
+    <!-- Status banner -->
+    {% if user.user_type %}
+    <div class="status-banner paid">
+    {% else %}
+    <div class="status-banner free">
+    {% endif %}
+      <div>
+        <div class="greeting">Dear {{ user.name }},</div>
+        <div class="sub-text">Thank you for being a valued member of AaramBD.</div>
+      </div>
+      {% if user.user_type %}
+      <span class="plan-badge paid">{{ user.user_type_label }}</span>
+      {% else %}
+      <span class="plan-badge free">{{ user.user_type_label }}</span>
+      {% endif %}
+    </div>
+
+    <!-- Stats row -->
+    <div class="two-col" style="margin-bottom: 28px;">
+      <div class="col">
+        <div class="col-label">Subscription Plan</div>
+        <div class="col-value accent">{{ user.user_type_label }}</div>
+      </div>
+      <div class="col">
+        <div class="col-label">Account Status</div>
+        <div class="col-value">
+          {% if user.status %}
+          <span class="status-pill active">{{ user.status_label }}</span>
+          {% else %}
+          <span class="status-pill inactive">{{ user.status_label }}</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Profile section -->
+    <div class="section">
+      <div class="section-title">Customer Information</div>
+      <table class="info-table">
+        <tr>
+          <td class="label">Full Name</td>
+          <td class="value">{{ user.name }}</td>
+        </tr>
+        <tr>
+          <td class="label">Phone Number</td>
+          <td class="value">{{ user.phone }}</td>
+        </tr>
+        <tr>
+          <td class="label">Location</td>
+          <td class="value">{{ user.location }}</td>
+        </tr>
+        <tr>
+          <td class="label">User ID</td>
+          <td class="value" style="color: #6366f1;">#{{ user.user_id }}</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Activity section -->
+    <div class="section">
+      <div class="section-title">Account Activity</div>
+      <table class="info-table">
+        <tr>
+          <td class="label">Member Since</td>
+          <td class="value">{{ user.user_logged_date }}</td>
+        </tr>
+        <tr>
+          <td class="label">Total Posts</td>
+          <td class="value">{{ user.user_total_post }}</td>
+        </tr>
+        <tr>
+          <td class="label">Receipt Number</td>
+          <td class="value">{{ user.receipt_no }}</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Thank you -->
+    <div class="thankyou">
+      <div class="headline">Thank you for choosing AaramBD</div>
+      <div class="body-text">
+        This document confirms your profile and subscription details on the AaramBD platform.<br>
+        For support or inquiries, visit <strong>www.aarambd.com</strong> or contact our support team.
+      </div>
+    </div>
+
+    <div style="font-size: 10px; color: #94a3b8; text-align: center;">
+      This is a system-generated document and does not require a signature.
+    </div>
+
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="footer-inner">
+      <div class="footer-brand">AaramBD</div>
+      <div class="footer-contact">
+        www.aarambd.com &nbsp;|&nbsp; control.aarambd.com<br>
+        Bangladesh Service Directory Platform
+      </div>
+      <div class="footer-note">
+        &copy; 2025 AaramBD<br>
+        All rights reserved
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>

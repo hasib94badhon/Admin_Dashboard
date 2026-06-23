@@ -1,15 +1,9 @@
-import 'dart:io';
-
 import 'package:data_table_2/data_table_2.dart';
-import 'package:open_file/open_file.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_web_dashboard/constants/style.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:flutter_web_dashboard/widgets/custom_text.dart';
-import 'dart:html' as html;
+import 'package:universal_html/html.dart' as html;
 import 'package:flutter_web_dashboard/config.dart';
 
 class Clientstable extends StatefulWidget {
@@ -20,72 +14,55 @@ class Clientstable extends StatefulWidget {
 }
 
 class _ClientstableState extends State<Clientstable> {
-  String selectedSort = 'recent'; // Default sort option
-  String? searchUserId; // Input field value for UserID
-  List<dynamic> userData = []; // List to store fetched user data
-  bool isLoading = true; // Loading state for data fetch
+  String selectedSort = 'recent';
+  String? searchUserId;
+  List<dynamic> userData = [];
+  bool isLoading = true;
+  final TextEditingController _searchController = TextEditingController();
 
-  // Function to fetch and sort user data
+  static const _sortOptions = [
+    ('recent', 'Most Recent'),
+    ('Category', 'By Category'),
+    ('paid', 'Paid Users'),
+    ('free', 'Free Users'),
+    ('User_Called', 'Most Called'),
+  ];
+
   Future<void> fetchData({String? userId}) async {
-    setState(() {
-      isLoading = true;
-    });
-
+    setState(() => isLoading = true);
     try {
-      // Base API URL
       String apiUrl = '$host/api/get-users/';
       if (userId != null && userId.isNotEmpty) {
         apiUrl += '?search=$userId';
       } else {
         apiUrl += '?sort=${selectedSort.toLowerCase()}';
       }
-
-      // Fetch data from API
       final response = await http.get(Uri.parse(apiUrl));
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
-
-        // Handle sorting logic for PAID and FREE
         if (responseData.containsKey('users')) {
           List users = responseData['users'];
-
-          // Check selectedSort for PAID or FREE
           if (selectedSort.toLowerCase() == 'paid') {
             setState(() {
-              userData = users
-                  .where(
-                      (user) => user['user_type'] == true) // Filter PAID users
-                  .toList();
+              userData = users.where((u) => u['user_type'] == true).toList();
             });
           } else if (selectedSort.toLowerCase() == 'free') {
             setState(() {
-              userData = users
-                  .where(
-                      (user) => user['user_type'] == false) // Filter FREE users
-                  .toList();
+              userData = users.where((u) => u['user_type'] == false).toList();
             });
           } else {
-            setState(() {
-              userData = users; // Load all users
-            });
+            setState(() => userData = users);
           }
         } else {
-          setState(() {
-            userData = []; // No users found
-          });
+          setState(() => userData = []);
         }
       } else {
         throw Exception("Failed to load data");
       }
     } catch (e) {
-      print("Error: $e");
-      setState(() {
-        userData = [];
-      });
+      setState(() => userData = []);
     } finally {
-      setState(() {
-        isLoading = false;
-      });
+      setState(() => isLoading = false);
     }
   }
 
@@ -93,497 +70,550 @@ class _ClientstableState extends State<Clientstable> {
     try {
       String apiUrl = '$host/api/download-user/?user_id=$userId';
       final response = await http.get(Uri.parse(apiUrl));
-
       if (response.statusCode == 200) {
         final contentDisposition = response.headers['Content-Disposition'];
         final fileName = contentDisposition != null
-            ? RegExp(r'filename="(.+)"')
-                .firstMatch(contentDisposition)
-                ?.group(1)
+            ? RegExp(r'filename="(.+)"').firstMatch(contentDisposition)?.group(1)
             : 'user_data.pdf';
-
         final blob = html.Blob([response.bodyBytes]);
         final url = html.Url.createObjectUrlFromBlob(blob);
-
-        final anchor = html.AnchorElement(href: url)
+        html.AnchorElement(href: url)
           ..download = fileName
           ..click();
-
         html.Url.revokeObjectUrl(url);
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Download started successfully!')),
-        );
-
-        print("Download triggered successfully.");
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Download started successfully!')),
+          );
+        }
       } else {
-        throw Exception(
-            "Failed to download PDF. Status Code: ${response.statusCode}");
+        throw Exception("Failed to download PDF. Status: ${response.statusCode}");
       }
     } catch (e) {
-      print("Error downloading or saving PDF: $e");
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error downloading or saving PDF: $e")),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error downloading PDF: $e")),
+        );
+      }
     }
   }
 
   Future<void> usertoggleStatus(int userId) async {
     final url = Uri.parse('$host/api/user_toggle_status/$userId/');
-
     try {
-      final response = await http.post(url);
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        print('User Status updated: ${data['status']}');
-      } else {
-        print('Failed to toggle user status: ${response.body}');
-      }
-    } catch (e) {
-      print('Error: $e');
-    }
+      await http.post(url);
+    } catch (_) {}
   }
 
   Future<void> usertypetoggleStatus(int userId) async {
     final url = Uri.parse('$host/api/user-type-toggle-status/$userId/');
-
     try {
-      final response = await http.post(url);
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        print('User Status updated: ${data['user_type']}');
-      } else {
-        print('Failed to toggle user status: ${response.body}');
-      }
-    } catch (e) {
-      print('Error: $e');
-    }
+      await http.post(url);
+    } catch (_) {}
   }
 
   @override
   void initState() {
     super.initState();
-    fetchData(); // Initial fetch when the widget loads
+    fetchData();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          // Search Bar with Search Button
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    onChanged: (value) {
-                      searchUserId = value; // Update search input
-                      if (value.isEmpty) {
-                        fetchData(); // Reload data when input is cleared
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Page header
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 16),
+          child: Row(
+            children: [
+              const Icon(Icons.people_rounded, size: 22, color: accentColor),
+              const SizedBox(width: 10),
+              const Text(
+                'Users',
+                style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: textPrimary),
+              ),
+              const Spacer(),
+              if (!isLoading && userData.isNotEmpty)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: accentLight,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '${userData.length} users',
+                    style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: accentColor),
+                  ),
+                ),
+            ],
+          ),
+        ),
+
+        // Search + Actions card
+        Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: borderColor),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2)),
+            ],
+          ),
+          child: Column(
+            children: [
+              // Search row
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      style: const TextStyle(fontSize: 14, color: textPrimary),
+                      decoration: InputDecoration(
+                        hintText: 'Search by ID / Phone / Name / Category...',
+                        hintStyle: const TextStyle(color: textMuted, fontSize: 14),
+                        prefixIcon: const Icon(Icons.search, color: textMuted, size: 20),
+                        suffixIcon: (searchUserId?.isNotEmpty ?? false)
+                            ? IconButton(
+                                icon: const Icon(Icons.clear, color: textMuted, size: 18),
+                                onPressed: () {
+                                  _searchController.clear();
+                                  setState(() => searchUserId = null);
+                                  fetchData();
+                                },
+                              )
+                            : null,
+                        filled: true,
+                        fillColor: background,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 11),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: borderColor),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: borderColor),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: const BorderSide(color: accentColor, width: 1.5),
+                        ),
+                      ),
+                      onChanged: (v) {
+                        setState(() => searchUserId = v.isEmpty ? null : v);
+                        if (v.isEmpty) fetchData();
+                      },
+                      onSubmitted: (v) {
+                        if (v.isNotEmpty) fetchData(userId: v);
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  _ActionButton(
+                    icon: Icons.search_rounded,
+                    label: 'Search',
+                    color: accentColor,
+                    onPressed: () {
+                      if (searchUserId?.isNotEmpty ?? false) {
+                        fetchData(userId: searchUserId);
                       }
                     },
-                    decoration: InputDecoration(
-                      hintText: "Search by UserID / Phone / Name / Category",
-                      filled: true,
-                      fillColor: Colors.blue,
-                      prefixIcon: const Icon(Icons.search, color: Colors.black),
-                      border: OutlineInputBorder(
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              // Sort row
+              Row(
+                children: [
+                  const Text('Sort:',
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: textSecondary)),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: background,
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide.none,
+                        border: Border.all(color: borderColor),
                       ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    // Fetch specific user data by ID
-                    if (searchUserId != null && searchUserId!.isNotEmpty) {
-                      fetchData(userId: searchUserId);
-                    }
-                  },
-                  icon: const Icon(Icons.search, color: Colors.white),
-                  label: const Text("Search"),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 15),
-                    backgroundColor: active,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    elevation: 3,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    downloadUserData(
-                        context, searchUserId); // Pass the context explicitly
-                  },
-                  icon: const Icon(Icons.download, color: Colors.white),
-                  label: const Text("Download"),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 15),
-                    backgroundColor: const Color.fromARGB(255, 25, 192, 81),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    elevation: 3,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Sorting Dropdowns
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                // Main Sort Dropdown
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    value: selectedSort,
-                    decoration: InputDecoration(
-                      //labelText: "Sort By",
-                      filled: true,
-                      fillColor: Colors.green,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                    items: const [
-                      DropdownMenuItem(
-                          value: 'recent', child: Text("Most recent")),
-                      DropdownMenuItem(
-                          value: 'Category', child: Text("Users by category")),
-                      DropdownMenuItem(value: 'paid', child: Text("PAID")),
-                      DropdownMenuItem(value: 'free', child: Text("FREE")),
-                      DropdownMenuItem(
-                          value: 'User_Called',
-                          child: Text("Users by most called")),
-                    ],
-                    onChanged: (newValue) {
-                      setState(() {
-                        selectedSort = newValue!;
-                        isLoading = true;
-                      });
-                      fetchData(); // Fetch sorted data
-                    },
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // User Data Table
-          Container(
-            padding: EdgeInsets.all(5),
-            color: Colors.pink,
-            child: isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : userData.isEmpty
-                    ? const Center(child: Text("No data available"))
-                    : Container(
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          border: Border.all(
-                              color: active.withOpacity(.4), width: .5),
-                          boxShadow: [
-                            BoxShadow(
-                              offset: const Offset(0, 6),
-                              color: lightGrey.withOpacity(.1),
-                              blurRadius: 12,
-                            )
-                          ],
-                          borderRadius: BorderRadius.circular(8),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: selectedSort,
+                          isExpanded: true,
+                          icon: const Icon(Icons.unfold_more_rounded,
+                              size: 18, color: textSecondary),
+                          style: const TextStyle(fontSize: 13, color: textPrimary),
+                          items: _sortOptions.map((opt) {
+                            return DropdownMenuItem<String>(
+                              value: opt.$1,
+                              child: Text(opt.$2),
+                            );
+                          }).toList(),
+                          onChanged: (v) {
+                            if (v != null) {
+                              setState(() {
+                                selectedSort = v;
+                                isLoading = true;
+                              });
+                              fetchData();
+                            }
+                          },
                         ),
-                        padding: const EdgeInsets.all(16),
-                        margin: const EdgeInsets.only(bottom: 30),
-                        child: SizedBox(
-                          height: (60 * 7) + 40,
-                          child: DataTable2(
-                            columnSpacing: 12,
-                            dataRowHeight: 60,
-                            headingRowHeight: 30,
-                            horizontalMargin: 12,
-                            minWidth: 700,
-                            columns: const [
-                              DataColumn2(
-                                label: Text("UserID"),
-                                size: ColumnSize.S,
-                              ),
-                              DataColumn2(
-                                label: Text('Category'),
-                                size: ColumnSize.L,
-                              ),
-                              DataColumn2(
-                                label: Text('Name'),
-                                size: ColumnSize.L,
-                              ),
-                              DataColumn2(
-                                label: Text('Phone Number'),
-                                size: ColumnSize.L,
-                              ),
-                              DataColumn(
-                                label: Text('User called'),
-                              ),
-                              DataColumn(
-                                label: Text('User Type'),
-                              ),
-                              DataColumn(
-                                label: Text('Status'),
-                              ),
-                            ],
-                            rows: List<DataRow>.generate(
-                              userData.length,
-                              (index) => DataRow(
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        // Table card
+        Expanded(
+          child: Container(
+            decoration: BoxDecoration(
+              color: surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: borderColor),
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2)),
+              ],
+            ),
+            child: isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(color: accentColor))
+                : userData.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.people_outline,
+                                size: 48, color: textMuted),
+                            const SizedBox(height: 8),
+                            const Text('No users found',
+                                style: TextStyle(
+                                    color: textSecondary, fontSize: 14)),
+                            const SizedBox(height: 12),
+                            TextButton.icon(
+                              onPressed: () => fetchData(),
+                              icon: const Icon(Icons.refresh, size: 16),
+                              label: const Text('Refresh'),
+                              style: TextButton.styleFrom(
+                                  foregroundColor: accentColor),
+                            ),
+                          ],
+                        ),
+                      )
+                    : ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: DataTable2(
+                          columnSpacing: 16,
+                          dataRowHeight: 60,
+                          headingRowHeight: 44,
+                          horizontalMargin: 16,
+                          minWidth: 780,
+                          headingRowColor: WidgetStateProperty.all(background),
+                          dividerThickness: 1,
+                          border: TableBorder(
+                            horizontalInside: BorderSide(
+                                color: borderColor, width: 1),
+                          ),
+                          columns: const [
+                            DataColumn2(
+                              label: Text('User ID',
+                                  style: _headerStyle),
+                              size: ColumnSize.S,
+                            ),
+                            DataColumn2(
+                              label: Text('Category',
+                                  style: _headerStyle),
+                              size: ColumnSize.L,
+                            ),
+                            DataColumn2(
+                              label: Text('Name',
+                                  style: _headerStyle),
+                              size: ColumnSize.L,
+                            ),
+                            DataColumn2(
+                              label: Text('Phone',
+                                  style: _headerStyle),
+                              size: ColumnSize.M,
+                            ),
+                            DataColumn(
+                              label: Text('Called',
+                                  style: _headerStyle),
+                            ),
+                            DataColumn(
+                              label: Text('Type',
+                                  style: _headerStyle),
+                            ),
+                            DataColumn(
+                              label: Text('Status',
+                                  style: _headerStyle),
+                            ),
+                            DataColumn(
+                              label: Text('Receipt',
+                                  style: _headerStyle),
+                            ),
+                          ],
+                          rows: List<DataRow>.generate(
+                            userData.length,
+                            (index) {
+                              final user = userData[index];
+                              final isActive = user['status'] == true;
+                              final isPaid = user['user_type'] == true;
+
+                              return DataRow(
                                 cells: [
-                                  DataCell(CustomText(
-                                      text: userData[index]['user_id']
-                                          .toString())),
-                                  DataCell(CustomText(
-                                      text: userData[index]['cat__cat_name']
-                                          .toString())),
-                                  DataCell(CustomText(
-                                      text:
-                                          userData[index]['name'].toString())),
-                                  DataCell(CustomText(
-                                    text: userData[index]['phone'].toString(),
-                                    color:
-                                        const Color.fromARGB(255, 1, 104, 54),
+                                  // User ID
+                                  DataCell(Text(
+                                    user['user_id'].toString(),
+                                    style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600,
+                                        color: textSecondary),
                                   )),
+                                  // Category
+                                  DataCell(Text(
+                                    user['cat__cat_name'].toString(),
+                                    style: const TextStyle(
+                                        fontSize: 13, color: textPrimary),
+                                    overflow: TextOverflow.ellipsis,
+                                  )),
+                                  // Name
+                                  DataCell(Text(
+                                    user['name'].toString(),
+                                    style: const TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                        color: textPrimary),
+                                    overflow: TextOverflow.ellipsis,
+                                  )),
+                                  // Phone
                                   DataCell(Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(
-                                        Icons.star,
-                                        color: Colors.deepOrange,
-                                        size: 18,
+                                      const Icon(Icons.phone_rounded,
+                                          size: 13, color: successColor),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        user['phone'].toString(),
+                                        style: const TextStyle(
+                                            fontSize: 13,
+                                            color: successColor,
+                                            fontWeight: FontWeight.w500),
                                       ),
-                                      SizedBox(
-                                        width: 5,
-                                      ),
-                                      CustomText(
-                                        text: userData[index]['user_called']
-                                            .toString(),
-                                      )
                                     ],
                                   )),
-                                  // DataCell(Container(
-                                  //   decoration: BoxDecoration(
-                                  //     color: light,
-                                  //     borderRadius: BorderRadius.circular(20),
-                                  //     border:
-                                  //         Border.all(color: active, width: .5),
-                                  //   ),
-                                  //   padding: const EdgeInsets.symmetric(
-                                  //       horizontal: 12, vertical: 6),
-                                  //   child: CustomText(
-                                  //     text: userData[index]
-                                  //         ['user_type'], // Toggle paid status
-                                  //     color: active.withOpacity(.7),
-                                  //     weight: FontWeight.bold,
-                                  //   ),
-                                  // )),
-
-                                  DataCell(
-                                    GestureDetector(
-                                      onTap: () async {
-                                        int user_id = userData[index][
-                                            'user_id']; // Assuming 'id' is present in your data
-                                        await usertypetoggleStatus(
-                                            user_id); // Call the API
-                                        // Reload or refresh the UI after the API call
-                                        setState(() {
-                                          userData[index]
-                                              ['user_type'] = !userData[
-                                                  index][
-                                              'user_type']; // Toggle status locally
-                                        });
-                                      },
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          color: userData[index]['user_type'] ==
-                                                  true
-                                              ? Colors.green.withOpacity(0.2)
-                                              : Colors.red.withOpacity(0.2),
-                                          borderRadius:
-                                              BorderRadius.circular(20),
-                                        ),
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 12, vertical: 6),
-                                        child: Text(
-                                          userData[index]['user_type'] == true
-                                              ? 'PAID'
-                                              : 'FREE',
-                                          style: TextStyle(
-                                            color: userData[index]
-                                                        ['user_type'] ==
-                                                    true
-                                                ? const Color.fromARGB(
-                                                    255, 89, 116, 238)
-                                                : const Color.fromARGB(
-                                                    255, 147, 154, 247),
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
+                                  // Called count
+                                  DataCell(Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.star_rounded,
+                                          color: warningColor, size: 16),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        user['user_called'].toString(),
+                                        style: const TextStyle(
+                                            fontSize: 13, color: textPrimary),
                                       ),
-                                    ),
-                                  ),
-                                  // DataCell(
-                                  //   StatefulBuilder(
-                                  //     builder: (context, setState) {
-                                  //       // Variable to track the toggle state
-                                  //       bool isActive =
-                                  //           true; // Active state toggles between "Active" and "Pause"
-
-                                  //       return Switch(
-                                  //         value: isActive,
-                                  //         onChanged: (value) {
-                                  //           setState(() {
-                                  //             isActive = value;
-                                  //           });
-
-                                  //           // Add your backend logic here for toggling Active/Pause
-                                  //           print(isActive
-                                  //               ? "Switched to Active"
-                                  //               : "Switched to Pause");
-                                  //         },
-                                  //         activeColor: Colors
-                                  //             .green, // Color for Active state
-                                  //         inactiveThumbColor: Colors
-                                  //             .red, // Color for Pause state
-                                  //         activeTrackColor: Colors.greenAccent,
-                                  //         inactiveTrackColor: Colors.redAccent,
-                                  //       );
-                                  //     },
-                                  //   ),
-                                  // )
+                                    ],
+                                  )),
+                                  // User type badge (PAID / FREE)
+                                  DataCell(GestureDetector(
+                                    onTap: () async {
+                                      final uid = user['user_id'] as int;
+                                      await usertypetoggleStatus(uid);
+                                      setState(() {
+                                        userData[index]['user_type'] =
+                                            !userData[index]['user_type'];
+                                      });
+                                    },
+                                    child: _TypeBadge(isPaid: isPaid),
+                                  )),
+                                  // Active/Inactive status badge
+                                  DataCell(GestureDetector(
+                                    onTap: () async {
+                                      final uid = user['user_id'] as int;
+                                      await usertoggleStatus(uid);
+                                      setState(() {
+                                        userData[index]['status'] =
+                                            !userData[index]['status'];
+                                      });
+                                    },
+                                    child: _StatusBadge(isActive: isActive),
+                                  )),
+                                  // Per-row download button
                                   DataCell(
-                                    GestureDetector(
-                                      onTap: () async {
-                                        int categoryId = userData[index][
-                                            'user_id']; // Assuming 'id' is present in your data
-                                        await usertoggleStatus(
-                                            categoryId); // Call the API
-                                        // Reload or refresh the UI after the API call
-                                        setState(() {
-                                          userData[index]['status'] = !userData[
-                                                  index][
-                                              'status']; // Toggle status locally
-                                        });
-                                      },
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          color: userData[index]['status'] ==
-                                                  true
-                                              ? Colors.green.withOpacity(0.2)
-                                              : Colors.red.withOpacity(0.2),
-                                          borderRadius:
-                                              BorderRadius.circular(20),
-                                        ),
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 12, vertical: 6),
-                                        child: Text(
-                                          userData[index]['status'] == true
-                                              ? 'Active'
-                                              : 'Inactive',
-                                          style: TextStyle(
-                                            color: userData[index]['status'] ==
-                                                    true
-                                                ? Colors.green
-                                                : Colors.red,
-                                            fontWeight: FontWeight.bold,
+                                    Tooltip(
+                                      message: 'Download Receipt',
+                                      child: InkWell(
+                                        onTap: () => downloadUserData(
+                                            context,
+                                            user['user_id'].toString()),
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: accentLight,
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                          child: const Icon(
+                                            Icons.download_rounded,
+                                            size: 16,
+                                            color: accentColor,
                                           ),
                                         ),
                                       ),
                                     ),
                                   ),
                                 ],
-                              ),
-                            ),
+                              );
+                            },
                           ),
                         ),
                       ),
           ),
+        ),
+      ],
+    );
+  }
+}
 
-          // Download User Data Section
-          // Container(
-          //   decoration: BoxDecoration(
-          //     color: Colors.white,
-          //     borderRadius: BorderRadius.circular(8),
-          //     border: Border.all(color: active.withOpacity(.4), width: .5),
-          //     boxShadow: [
-          //       BoxShadow(
-          //         offset: const Offset(0, 6),
-          //         color: lightGrey.withOpacity(.1),
-          //         blurRadius: 12,
-          //       )
-          //     ],
-          //   ),
-          //   padding: const EdgeInsets.all(16),
-          //   margin: const EdgeInsets.only(bottom: 30),
-          //   child: Column(
-          //     crossAxisAlignment: CrossAxisAlignment.start,
-          //     children: [
-          //       const CustomText(
-          //         text: "Download User Data",
-          //         size: 18,
-          //         weight: FontWeight.bold,
-          //         color: Colors.black87,
-          //       ),
-          //       const SizedBox(height: 16),
-          //       Row(
-          //         children: [
-          //           Expanded(
-          //             child: TextField(
-          //               decoration: InputDecoration(
-          //                 hintText: "Enter UserID",
-          //                 filled: true,
-          //                 fillColor: light,
-          //                 prefixIcon:
-          //                     const Icon(Icons.search, color: Colors.grey),
-          //                 border: OutlineInputBorder(
-          //                   borderRadius: BorderRadius.circular(8),
-          //                   borderSide: BorderSide.none,
-          //                 ),
-          //               ),
-          //             ),
-          //           ),
-          //           const SizedBox(width: 16),
-          //           ElevatedButton.icon(
-          //             onPressed: () {
-          //               // Handle download functionality here
-          //             },
-          //             icon: const Icon(Icons.download, color: Colors.white),
-          //             label: const Text("Download"),
-          //             style: ElevatedButton.styleFrom(
-          //               padding: const EdgeInsets.symmetric(
-          //                   horizontal: 24, vertical: 16),
-          //               backgroundColor: active,
-          //               shape: RoundedRectangleBorder(
-          //                 borderRadius: BorderRadius.circular(8),
-          //               ),
-          //               elevation: 3,
-          //             ),
-          //           ),
-          //         ],
-          //       ),
-          //       const SizedBox(height: 8),
-          //       const Text(
-          //         "Enter a UserID to download all related data.",
-          //         style: TextStyle(color: Colors.grey),
-          //       ),
-          //     ],
-          //   ),
-          // ),
+const _headerStyle = TextStyle(
+  fontSize: 12,
+  fontWeight: FontWeight.w600,
+  color: textSecondary,
+  letterSpacing: 0.5,
+);
+
+class _ActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onPressed;
+
+  const _ActionButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ElevatedButton.icon(
+      onPressed: onPressed,
+      icon: Icon(icon, size: 16, color: Colors.white),
+      label: Text(label,
+          style: const TextStyle(fontSize: 13, color: Colors.white)),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: color,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        elevation: 0,
+      ),
+    );
+  }
+}
+
+class _TypeBadge extends StatelessWidget {
+  final bool isPaid;
+  const _TypeBadge({required this.isPaid});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: isPaid
+            ? accentColor.withValues(alpha: 0.1)
+            : textMuted.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isPaid
+              ? accentColor.withValues(alpha: 0.3)
+              : textMuted.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Text(
+        isPaid ? 'PAID' : 'FREE',
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          color: isPaid ? accentColor : textSecondary,
+          letterSpacing: 0.5,
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusBadge extends StatelessWidget {
+  final bool isActive;
+  const _StatusBadge({required this.isActive});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: isActive
+            ? successColor.withValues(alpha: 0.1)
+            : errorColor.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isActive
+              ? successColor.withValues(alpha: 0.3)
+              : errorColor.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 6,
+            height: 6,
+            decoration: BoxDecoration(
+              color: isActive ? successColor : errorColor,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(
+            isActive ? 'Active' : 'Inactive',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: isActive ? successColor : errorColor,
+            ),
+          ),
         ],
       ),
     );

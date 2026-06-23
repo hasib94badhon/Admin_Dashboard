@@ -1,5 +1,5 @@
-import 'dart:math';
-import 'package:charts_flutter_new/flutter.dart' as charts;
+import 'dart:math' show max;
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_web_dashboard/constants/style.dart';
 import 'package:flutter_web_dashboard/service_api/api_service.dart';
@@ -13,11 +13,9 @@ class RegistrationChart extends StatefulWidget {
 
 class _RegistrationChartState extends State<RegistrationChart> {
   bool showMonth = false;
-  List<dynamic> registrationsDay = [];
-  List<dynamic> registrationsMonth = [];
-
-  final ScrollController _horizontalController = ScrollController();
-  final ScrollController _verticalController = ScrollController();
+  List<Map<String, dynamic>> registrationsDay = [];
+  List<Map<String, dynamic>> registrationsMonth = [];
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -28,101 +26,79 @@ class _RegistrationChartState extends State<RegistrationChart> {
   Future<void> _loadData() async {
     final stats = await DashboardService.fetchStats();
     setState(() {
-      registrationsDay = stats['registrations_day'] ?? [];
-      registrationsMonth = stats['registrations_month'] ?? [];
+      registrationsDay =
+          List<Map<String, dynamic>>.from(stats['registrations_day'] ?? []);
+      registrationsMonth =
+          List<Map<String, dynamic>>.from(stats['registrations_month'] ?? []);
     });
   }
 
   @override
   void dispose() {
-    _horizontalController.dispose();
-    _verticalController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  String formatMonth(String ym) {
-    final parts = ym.split("-");
-    final year = parts[0];
-    final monthNum = int.parse(parts[1]);
-    const monthNames = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec"
+  String _label(Map<String, dynamic> entry) {
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
     ];
-    return "${monthNames[monthNum - 1]} $year";
+    if (showMonth) {
+      final parts = entry['month'].toString().split('-');
+      return '${months[int.parse(parts[1]) - 1]}\n${parts[0]}';
+    } else {
+      final parts = entry['day'].toString().split('-');
+      return '${parts[2]}\n${months[int.parse(parts[1]) - 1]}';
+    }
   }
 
-  String formatDay(String dateStr) {
-    try {
-      final parts = dateStr.split("-");
-      final year = parts[0];
-      final monthNum = int.parse(parts[1]);
-      final day = parts[2];
-      const monthNames = [
-        "Jan",
-        "Feb",
-        "Mar",
-        "Apr",
-        "May",
-        "Jun",
-        "Jul",
-        "Aug",
-        "Sep",
-        "Oct",
-        "Nov",
-        "Dec"
-      ];
-      return "$day ${monthNames[monthNum - 1]} $year";
-    } catch (e) {
-      return dateStr;
-    }
+  String _formatValue(double v) {
+    if (v >= 1000000) return '${(v / 1000000).toStringAsFixed(1)}M';
+    if (v >= 1000) return '${(v / 1000).toStringAsFixed(1)}K';
+    return v.toInt().toString();
   }
 
   @override
   Widget build(BuildContext context) {
     final data = showMonth ? registrationsMonth : registrationsDay;
+    const double groupW = 72;
+    final chartWidth = max(500.0, data.length * groupW);
+    final maxY = data.isEmpty
+        ? 10.0
+        : data
+                .map((e) => (e['count'] as num).toDouble())
+                .reduce(max) *
+            1.25;
 
-    final series = [
-      charts.Series<Map<String, dynamic>, String>(
-        id: 'Registrations',
-        colorFn: (_, __) => charts.ColorUtil.fromDartColor(active),
-        domainFn: (Map<String, dynamic> reg, _) => showMonth
-            ? formatMonth(reg['month'].toString())
-            : formatDay(reg['day'].toString()),
-        measureFn: (Map<String, dynamic> reg, _) => reg['count'],
-        data: data.cast<Map<String, dynamic>>(),
-        labelAccessorFn: (Map<String, dynamic> reg, _) =>
-            reg['count'].toString(),
-      )
-    ];
-
-    const double perBarWidth = 100;
-    const double baseHeight = 400;
-    final chartWidth = max(600.0, data.length * perBarWidth);
-    final chartHeight = baseHeight;
+    final groups = data.asMap().entries.map((e) {
+      return BarChartGroupData(
+        x: e.key,
+        barRods: [
+          BarChartRodData(
+            toY: (e.value['count'] as num).toDouble(),
+            color: active,
+            width: 26,
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(4)),
+          ),
+        ],
+      );
+    }).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // Toggle Buttons
         Row(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
             TextButton(
               onPressed: () => setState(() => showMonth = false),
               child: Text(
-                "Day",
+                'Day',
                 style: TextStyle(
-                  fontWeight: !showMonth ? FontWeight.bold : FontWeight.normal,
+                  fontWeight:
+                      !showMonth ? FontWeight.bold : FontWeight.normal,
                   color: !showMonth ? active : Colors.black54,
                 ),
               ),
@@ -130,81 +106,105 @@ class _RegistrationChartState extends State<RegistrationChart> {
             TextButton(
               onPressed: () => setState(() => showMonth = true),
               child: Text(
-                "Month",
+                'Month',
                 style: TextStyle(
-                  fontWeight: showMonth ? FontWeight.bold : FontWeight.normal,
+                  fontWeight:
+                      showMonth ? FontWeight.bold : FontWeight.normal,
                   color: showMonth ? active : Colors.black54,
                 ),
               ),
             ),
           ],
         ),
-        const SizedBox(height: 10),
-
-        // Scrollable Chart Area
+        const SizedBox(height: 8),
         Flexible(
           child: Scrollbar(
-            controller: _horizontalController,
+            controller: _scrollController,
             thumbVisibility: true,
             child: SingleChildScrollView(
-              controller: _horizontalController,
+              controller: _scrollController,
               scrollDirection: Axis.horizontal,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(
-                  minWidth: chartWidth,
-                  minHeight: chartHeight,
-                ),
-                child: Scrollbar(
-                  controller: _verticalController,
-                  thumbVisibility: true,
-                  child: SingleChildScrollView(
-                    controller: _verticalController,
-                    scrollDirection: Axis.vertical,
-                    child: SizedBox(
-                      width: chartWidth,
-                      height: chartHeight,
-                      child: charts.BarChart(
-                        series,
-                        animate: true,
-                        vertical: true,
-                        barRendererDecorator: charts.BarLabelDecorator<String>(
-                          labelPosition: charts.BarLabelPosition.auto,
-                        ),
-                        domainAxis: charts.OrdinalAxisSpec(
-                          renderSpec: charts.SmallTickRendererSpec(
-                            labelRotation: 60,
-                            labelStyle: charts.TextStyleSpec(
-                              fontSize: 11,
-                              color: charts.MaterialPalette.black,
+              child: SizedBox(
+                width: chartWidth,
+                height: 360,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 16, top: 8),
+                  child: BarChart(
+                    BarChartData(
+                      maxY: maxY,
+                      barGroups: groups,
+                      alignment: BarChartAlignment.spaceAround,
+                      barTouchData: BarTouchData(
+                        touchTooltipData: BarTouchTooltipData(
+                          getTooltipColor: (_) =>
+                              Colors.blueGrey.shade700,
+                          getTooltipItem: (group, gi, rod, _) =>
+                              BarTooltipItem(
+                            '${_label(data[gi])}\n${_formatValue(rod.toY)}',
+                            const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
                             ),
                           ),
                         ),
-                        primaryMeasureAxis: charts.NumericAxisSpec(
-                          tickFormatterSpec:
-                              charts.BasicNumericTickFormatterSpec(
-                            (num? value) {
-                              if (value == null) return '';
-                              if (value >= 1000000)
-                                return '${(value / 1000000).toStringAsFixed(1)}M';
-                              if (value >= 1000)
-                                return '${(value / 1000).toStringAsFixed(1)}K';
-                              return value.toString();
+                      ),
+                      titlesData: FlTitlesData(
+                        bottomTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 52,
+                            getTitlesWidget: (value, _) {
+                              final i = value.toInt();
+                              if (i < 0 || i >= data.length) {
+                                return const SizedBox.shrink();
+                              }
+                              return Padding(
+                                padding: const EdgeInsets.only(top: 6),
+                                child: RotatedBox(
+                                  quarterTurns: 1,
+                                  child: Text(
+                                    _label(data[i]),
+                                    style: const TextStyle(
+                                        fontSize: 9,
+                                        color: Colors.black54),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ),
+                              );
                             },
                           ),
                         ),
-                        behaviors: [
-                          charts.PanAndZoomBehavior(),
-                          charts.ChartTitle(
-                            showMonth
-                                ? 'Monthly Registrations'
-                                : 'Daily Registrations',
-                            behaviorPosition: charts.BehaviorPosition.top,
-                            titleStyleSpec: charts.TextStyleSpec(fontSize: 14),
-                            titleOutsideJustification:
-                                charts.OutsideJustification.middleDrawArea,
+                        leftTitles: AxisTitles(
+                          sideTitles: SideTitles(
+                            showTitles: true,
+                            reservedSize: 44,
+                            getTitlesWidget: (value, meta) {
+                              if (value == meta.max || value == 0) {
+                                return const SizedBox.shrink();
+                              }
+                              return Text(
+                                _formatValue(value),
+                                style: const TextStyle(
+                                    fontSize: 10, color: Colors.black54),
+                              );
+                            },
                           ),
-                        ],
+                        ),
+                        topTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
+                        rightTitles: const AxisTitles(
+                            sideTitles: SideTitles(showTitles: false)),
                       ),
+                      gridData: FlGridData(
+                        show: true,
+                        drawVerticalLine: false,
+                        getDrawingHorizontalLine: (_) => FlLine(
+                          color: Colors.grey.withValues(alpha: 0.18),
+                          strokeWidth: 1,
+                        ),
+                      ),
+                      borderData: FlBorderData(show: false),
                     ),
                   ),
                 ),
@@ -212,12 +212,11 @@ class _RegistrationChartState extends State<RegistrationChart> {
             ),
           ),
         ),
-
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         Text(
           showMonth
-              ? 'Showing ${data.length} months — scroll horizontally or vertically'
-              : 'Showing ${data.length} days — scroll horizontally or vertically',
+              ? 'Showing ${data.length} months — scroll horizontally'
+              : 'Showing ${data.length} days — scroll horizontally',
           textAlign: TextAlign.center,
           style: TextStyle(color: lightGrey, fontSize: 12),
         ),

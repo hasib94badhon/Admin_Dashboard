@@ -1,7 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_web_dashboard/config.dart'; // এখানে $host আছে
+import 'package:flutter_web_dashboard/config.dart';
+import 'package:flutter_web_dashboard/constants/style.dart';
 import 'package:http/http.dart' as http;
 import 'package:data_table_2/data_table_2.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -25,23 +26,20 @@ class _SubscriberPageState extends State<SubscriberPage> {
 
   final TextEditingController _searchController = TextEditingController();
 
-  final List<Color> rowColors = [
-    Colors.blue.shade50,
-    Colors.orange.shade50,
-    Colors.purple.shade50,
-    Colors.teal.shade50,
-    Colors.amber.shade50,
-    Colors.indigo.shade50,
+  static const _sortOptions = [
+    ('', 'All'),
+    ('recent', 'Recent'),
+    ('type', 'Type'),
+    ('cat', 'Category'),
+    ('service', 'Service'),
+    ('shop', 'Shop'),
   ];
 
   Future<void> fetchSubscribers() async {
     setState(() => isLoading = true);
-
     final url = Uri.parse(
         "$host/api/subscriber-users/?page=$currentPage&search=$searchQuery&sort=$sortBy");
-
     final response = await http.get(url);
-
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       setState(() {
@@ -57,57 +55,60 @@ class _SubscriberPageState extends State<SubscriberPage> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text("Confirm Action"),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text('Confirm Action',
+            style: TextStyle(fontWeight: FontWeight.w700, color: textPrimary)),
         content: Text(
           currentType == "paid"
-              ? "Do you want to mark this subscriber as Unpaid?"
-              : "Do you want to mark this subscriber as Paid?",
+              ? "Mark this subscriber as Unpaid?"
+              : "Mark this subscriber as Paid?",
+          style: const TextStyle(color: textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text("Cancel"),
+            child: const Text('Cancel',
+                style: TextStyle(color: textSecondary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text("Confirm"),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: accentColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8)),
+                elevation: 0),
+            child: const Text('Confirm'),
           ),
         ],
       ),
     );
 
-    if (confirm != true) return; // Cancel করলে কিছু হবে না
+    if (confirm != true) return;
 
     final url = Uri.parse("$host/api/toggle-subscriber/$subId/");
     final response = await http.post(url);
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Subscriber ${data['sub_id']} is now ${data['type']}"),
-          backgroundColor: Colors.green,
-        ),
-      );
-
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text("Subscriber ${data['sub_id']} is now ${data['type']}"),
+        backgroundColor: successColor,
+        behavior: SnackBarBehavior.floating,
+      ));
       fetchSubscribers();
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Failed to toggle subscriber"),
-          backgroundColor: Colors.red,
-        ),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text("Failed to toggle subscriber"),
+        backgroundColor: errorColor,
+        behavior: SnackBarBehavior.floating,
+      ));
     }
   }
 
   void _copyRowData(Map<String, dynamic> row) {
     final buffer = StringBuffer();
-    row.forEach((key, value) {
-      buffer.writeln("$key: ${value ?? ''}");
-    });
-
+    row.forEach((key, value) => buffer.writeln("$key: ${value ?? ''}"));
     Clipboard.setData(ClipboardData(text: buffer.toString()));
   }
 
@@ -117,295 +118,598 @@ class _SubscriberPageState extends State<SubscriberPage> {
     fetchSubscribers();
   }
 
-  Widget _buildSummaryCard() {
-    if (summary.isEmpty) return const SizedBox.shrink();
-    return Card(
-      margin: const EdgeInsets.all(8),
-      elevation: 4,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            _buildSummaryItem(
-                "Total", summary['total_subscribers'].toString(), Colors.blue),
-            _buildSummaryItem("Service Paid",
-                summary['service_paid'].toString(), Colors.green),
-            _buildSummaryItem("Service Unpaid",
-                summary['service_unpaid'].toString(), Colors.red),
-            _buildSummaryItem(
-                "Shop Paid", summary['shop_paid'].toString(), Colors.green),
-            _buildSummaryItem(
-                "Shop Unpaid", summary['shop_unpaid'].toString(), Colors.red),
-            _buildSummaryItem("Categories",
-                summary['total_categories'].toString(), Colors.orange),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSummaryItem(String title, String value, Color color) {
-    return Column(
-      children: [
-        Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        Text(value,
-            style: TextStyle(
-                color: color, fontSize: 16, fontWeight: FontWeight.bold)),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("Subscribers")),
-      body: Column(
-        children: [
-          _buildSummaryCard(),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 8, 4, 16),
+          child: Row(
+            children: [
+              const Icon(Icons.card_membership_rounded,
+                  size: 22, color: accentColor),
+              const SizedBox(width: 10),
+              const Text('Subscribers',
+                  style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      color: textPrimary)),
+              const Spacer(),
+              if (summary.isNotEmpty) ...[
+                _SummaryChip(
+                    label: 'Total',
+                    value: summary['total_subscribers']?.toString() ?? '0',
+                    color: accentColor),
+                const SizedBox(width: 6),
+                _SummaryChip(
+                    label: 'Svc Paid',
+                    value: summary['service_paid']?.toString() ?? '0',
+                    color: successColor),
+                const SizedBox(width: 6),
+                _SummaryChip(
+                    label: 'Svc Unpaid',
+                    value: summary['service_unpaid']?.toString() ?? '0',
+                    color: errorColor),
+                const SizedBox(width: 6),
+                _SummaryChip(
+                    label: 'Shop Paid',
+                    value: summary['shop_paid']?.toString() ?? '0',
+                    color: successColor),
+                const SizedBox(width: 6),
+                _SummaryChip(
+                    label: 'Shop Unpaid',
+                    value: summary['shop_unpaid']?.toString() ?? '0',
+                    color: errorColor),
+                const SizedBox(width: 6),
+                _SummaryChip(
+                    label: 'Cats',
+                    value: summary['total_categories']?.toString() ?? '0',
+                    color: warningColor),
+              ],
+            ],
+          ),
+        ),
 
-          // 🔎 Search + Sort controls
-          Padding(
-            padding: const EdgeInsets.all(15),
-            child: Column(
-              children: [
-                // Create Subscribers Button
-                Row(
-                  children: [
-                    ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 12),
-                        backgroundColor: Colors.green,
-                        foregroundColor: Colors.white70,
-                      ),
-                      icon: const Icon(Icons.add),
-                      label: const Text("Add Eligible Subscribers"),
-                      onPressed: () async {
-                        setState(() => isLoading = true);
-
-                        final url = Uri.parse("$host/api/create-subscribers/");
-                        final response = await http.post(url);
-
-                        setState(() => isLoading = false);
-
-                        if (response.statusCode == 201) {
-                          final data = json.decode(response.body);
-                          final summary = data['summary'];
-
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
-                                "New: ${summary['total_new']} "
-                                "(Service: ${summary['service_new']}, Shop: ${summary['shop_new']})",
-                              ),
-                              backgroundColor: Colors.green,
-                            ),
-                          );
-
-                          // Refresh subscribers list
-                          currentPage = 1;
-                          fetchSubscribers();
-                        } else {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text("Failed to create subscribers"),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                        }
-                      },
+        // Controls card
+        Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: surface,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: borderColor),
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.04),
+                  blurRadius: 6,
+                  offset: const Offset(0, 2))
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Add button + search row
+              Row(
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: () async {
+                      setState(() => isLoading = true);
+                      final url =
+                          Uri.parse("$host/api/create-subscribers/");
+                      final messenger = ScaffoldMessenger.of(context);
+                      final response = await http.post(url);
+                      setState(() => isLoading = false);
+                      if (response.statusCode == 201) {
+                        final data = json.decode(response.body);
+                        final s = data['summary'];
+                        messenger.showSnackBar(SnackBar(
+                          content: Text(
+                              "Added ${s['total_new']} (Service: ${s['service_new']}, Shop: ${s['shop_new']})"),
+                          backgroundColor: successColor,
+                          behavior: SnackBarBehavior.floating,
+                        ));
+                        currentPage = 1;
+                        fetchSubscribers();
+                      } else {
+                        messenger.showSnackBar(const SnackBar(
+                            content: Text("Failed to create subscribers"),
+                            backgroundColor: errorColor,
+                            behavior: SnackBarBehavior.floating));
+                      }
+                    },
+                    icon: const Icon(Icons.add_rounded,
+                        size: 16, color: Colors.white),
+                    label: const Text('Add Eligible Subscribers',
+                        style:
+                            TextStyle(fontSize: 13, color: Colors.white)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: successColor,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 13),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
                     ),
-                  ],
-                ),
-
-                const SizedBox(height: 8),
-
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _searchController,
-                        decoration: const InputDecoration(
-                          hintText:
-                              "Search by User ID / Name / Phone / Category / Service / Shop",
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.search),
-                        ),
-                        onSubmitted: (value) {
-                          searchQuery = value;
-                          currentPage = 1;
-                          fetchSubscribers();
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    DropdownButton<String>(
-                      value: sortBy.isEmpty ? null : sortBy,
-                      hint: const Text("Sort"),
-                      items: const [
-                        DropdownMenuItem(
-                            value: "recent", child: Text("Recent")),
-                        DropdownMenuItem(value: "type", child: Text("Type")),
-                        DropdownMenuItem(value: "cat", child: Text("Category")),
-                        DropdownMenuItem(
-                            value: "service", child: Text("Service")),
-                        DropdownMenuItem(value: "shop", child: Text("Shop")),
-                      ],
-                      onChanged: (value) {
-                        sortBy = value ?? "";
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextField(
+                      controller: _searchController,
+                      style: const TextStyle(
+                          fontSize: 13, color: textPrimary),
+                      onSubmitted: (value) {
+                        searchQuery = value;
                         currentPage = 1;
                         fetchSubscribers();
                       },
+                      decoration: InputDecoration(
+                        hintText:
+                            'Search by User ID / Name / Phone / Category / Service / Shop',
+                        hintStyle: const TextStyle(
+                            color: textMuted, fontSize: 13),
+                        prefixIcon: const Icon(Icons.search_rounded,
+                            size: 16, color: textMuted),
+                        isDense: true,
+                        filled: true,
+                        fillColor: background,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 11),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide:
+                                const BorderSide(color: borderColor)),
+                        enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide:
+                                const BorderSide(color: borderColor)),
+                        focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                                color: accentColor, width: 1.5)),
+                      ),
                     ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          Expanded(
-            child: DataTable2(
-              headingRowColor: MaterialStateProperty.all(Colors.grey[200]),
-              columnSpacing: 30,
-              horizontalMargin: 10,
-              dataRowHeight: 85,
-              minWidth: 1400,
-              columns: const [
-                DataColumn(
-                    label: Text("User ID",
-                        style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(
-                    label: Text("Name",
-                        style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(
-                    label: Text("Phone",
-                        style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(
-                    label: Text("Category",
-                        style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(
-                    label: Text("Service ID",
-                        style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(
-                    label: Text("Shop ID",
-                        style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(
-                    label: Text("Type",
-                        style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(
-                    label: Text("Last Pay",
-                        style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(
-                    label: Text("Location",
-                        style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(
-                    label: Text("Action",
-                        style: TextStyle(fontWeight: FontWeight.bold))),
-                DataColumn(
-                    label: Text("Copy Data",
-                        style: TextStyle(fontWeight: FontWeight.bold))),
-              ],
-              rows: List<DataRow>.generate(
-                subscribers.length,
-                (index) {
-                  final s = subscribers[index];
-                  final subscriberColor = (s['type']?.toLowerCase() == "paid")
-                      ? Colors.green
-                      : Colors.red;
-
-                  return DataRow(
-                    color: MaterialStateProperty.all(
-                        rowColors[index % rowColors.length]),
-                    cells: [
-                      DataCell(_buildCellText(s['user_id'].toString())),
-                      DataCell(_buildCellText(s['user_name'] ?? "")),
-                      DataCell(_buildCellText(s['phone'] ?? "")),
-                      DataCell(_buildCellText(s['category'] ?? "")),
-                      DataCell(_buildCellText(s['service_id'].toString())),
-                      DataCell(_buildCellText(s['shop_id'].toString())),
-                      DataCell(Text(
-                        s['type'] ?? "",
-                        style: TextStyle(
-                            color: subscriberColor,
-                            fontWeight: FontWeight.bold),
-                      )),
-                      DataCell(_buildCellText(
-                          TimeFormatter.formatBdTime(s['last_pay'] ?? ""))),
-                      DataCell(_buildCellText(s['location_address'] ?? "")),
-                      DataCell(
-                        ElevatedButton(
-                          onPressed: () =>
-                              toggleSubscriber(s['sub_id'], s['type']),
-                          child: Text(
-                            s['type'] == "paid" ? "Mark Unpaid" : "Mark Paid",
-                          ),
+                  ),
+                  const SizedBox(width: 10),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      searchQuery = _searchController.text.trim();
+                      currentPage = 1;
+                      fetchSubscribers();
+                    },
+                    icon: const Icon(Icons.search_rounded,
+                        size: 16, color: Colors.white),
+                    label: const Text('Search',
+                        style:
+                            TextStyle(fontSize: 13, color: Colors.white)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: accentColor,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 18, vertical: 13),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // Sort pills
+              Row(
+                children: _sortOptions.map((opt) {
+                  final isSelected = sortBy == opt.$1;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() => sortBy = opt.$1);
+                        currentPage = 1;
+                        fetchSubscribers();
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: isSelected ? accentColor : background,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                              color: isSelected
+                                  ? accentColor
+                                  : borderColor),
                         ),
+                        child: Text(opt.$2,
+                            style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: isSelected
+                                    ? Colors.white
+                                    : textSecondary)),
                       ),
-                      DataCell(
-                        IconButton(
-                          icon: const Icon(Icons.copy),
-                          tooltip: 'Copy Row Data',
-                          onPressed: () => _copyRowData(s),
-                        ),
-                      ),
-                    ],
+                    ),
                   );
-                },
-              ),
-            ),
-          ),
-
-          // Pagination controls
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ElevatedButton(
-                onPressed: currentPage > 1
-                    ? () {
-                        setState(() {
-                          currentPage--;
-                        });
-                        fetchSubscribers();
-                      }
-                    : null,
-                child: const Text("Prev"),
-              ),
-              const SizedBox(width: 16),
-              ElevatedButton(
-                onPressed: hasMore
-                    ? () {
-                        setState(() {
-                          currentPage++;
-                        });
-                        fetchSubscribers();
-                      }
-                    : null,
-                child: const Text("Next"),
+                }).toList(),
               ),
             ],
           ),
+        ),
 
-          if (isLoading)
-            const Padding(
-              padding: EdgeInsets.all(8),
-              child: CircularProgressIndicator(),
+        // Table
+        Expanded(
+          child: Container(
+            decoration: BoxDecoration(
+              color: surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: borderColor),
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2))
+              ],
             ),
+            child: isLoading
+                ? const Center(
+                    child: CircularProgressIndicator(color: accentColor))
+                : subscribers.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.card_membership_outlined,
+                                size: 48, color: textMuted),
+                            const SizedBox(height: 8),
+                            const Text('No subscribers found',
+                                style: TextStyle(
+                                    color: textSecondary, fontSize: 14)),
+                          ],
+                        ),
+                      )
+                    : ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: DataTable2(
+                          headingRowColor:
+                              WidgetStateProperty.all(background),
+                          columnSpacing: 20,
+                          horizontalMargin: 16,
+                          dataRowHeight: 60,
+                          headingRowHeight: 44,
+                          minWidth: 1400,
+                          dividerThickness: 1,
+                          columns: const [
+                            DataColumn2(
+                                label: Text('User ID', style: _hStyle),
+                                fixedWidth: 80),
+                            DataColumn2(
+                                label: Text('Name', style: _hStyle),
+                                size: ColumnSize.L),
+                            DataColumn2(
+                                label: Text('Phone', style: _hStyle),
+                                fixedWidth: 120),
+                            DataColumn2(
+                                label:
+                                    Text('Category', style: _hStyle),
+                                size: ColumnSize.M),
+                            DataColumn2(
+                                label:
+                                    Text('Service ID', style: _hStyle),
+                                fixedWidth: 90),
+                            DataColumn2(
+                                label: Text('Shop ID', style: _hStyle),
+                                fixedWidth: 80),
+                            DataColumn2(
+                                label: Text('Type', style: _hStyle),
+                                fixedWidth: 90),
+                            DataColumn2(
+                                label: Text('Last Pay', style: _hStyle),
+                                size: ColumnSize.M),
+                            DataColumn2(
+                                label:
+                                    Text('Location', style: _hStyle),
+                                size: ColumnSize.L),
+                            DataColumn2(
+                                label: Text('Action', style: _hStyle),
+                                fixedWidth: 110),
+                            DataColumn2(
+                                label: Text('Copy', style: _hStyle),
+                                fixedWidth: 60),
+                          ],
+                          rows: List<DataRow2>.generate(
+                            subscribers.length,
+                            (index) {
+                              final s = subscribers[index];
+                              final isPaid =
+                                  s['type']?.toLowerCase() == 'paid';
+                              return DataRow2(
+                                cells: [
+                                  DataCell(Text(
+                                      '${s['user_id']}',
+                                      style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: textSecondary))),
+                                  DataCell(Text(
+                                      s['user_name'] ?? '',
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: GoogleFonts.notoSansBengali(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500,
+                                          color: textPrimary))),
+                                  DataCell(Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(Icons.phone_rounded,
+                                          size: 12, color: successColor),
+                                      const SizedBox(width: 4),
+                                      Text(s['phone'] ?? '',
+                                          style: const TextStyle(
+                                              fontSize: 12,
+                                              color: successColor)),
+                                    ],
+                                  )),
+                                  DataCell(Text(
+                                      s['category'] ?? '',
+                                      style: const TextStyle(
+                                          fontSize: 13,
+                                          color: textPrimary))),
+                                  DataCell(Text(
+                                      '${s['service_id']}',
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          color: textSecondary))),
+                                  DataCell(Text(
+                                      '${s['shop_id']}',
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          color: textSecondary))),
+                                  DataCell(_SubTypeBadge(isPaid: isPaid)),
+                                  DataCell(Text(
+                                      TimeFormatter.formatBdTime(
+                                          s['last_pay'] ?? ''),
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          color: textSecondary))),
+                                  DataCell(Text(
+                                      s['location_address'] ?? '',
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                          fontSize: 12,
+                                          color: textSecondary))),
+                                  DataCell(GestureDetector(
+                                    onTap: () => toggleSubscriber(
+                                        s['sub_id'], s['type']),
+                                    child: Container(
+                                      padding:
+                                          const EdgeInsets.symmetric(
+                                              horizontal: 10,
+                                              vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: isPaid
+                                            ? errorColor.withValues(
+                                                alpha: 0.1)
+                                            : successColor.withValues(
+                                                alpha: 0.1),
+                                        borderRadius:
+                                            BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: isPaid
+                                              ? errorColor.withValues(
+                                                  alpha: 0.3)
+                                              : successColor.withValues(
+                                                  alpha: 0.3),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        isPaid
+                                            ? 'Mark Unpaid'
+                                            : 'Mark Paid',
+                                        style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                            color: isPaid
+                                                ? errorColor
+                                                : successColor),
+                                      ),
+                                    ),
+                                  )),
+                                  DataCell(IconButton(
+                                    icon: const Icon(Icons.copy_rounded,
+                                        size: 16, color: accentColor),
+                                    tooltip: 'Copy row data',
+                                    onPressed: () => _copyRowData(s),
+                                  )),
+                                ],
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+          ),
+        ),
+
+        // Pagination
+        Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _PageButton(
+                label: 'Prev',
+                icon: Icons.chevron_left_rounded,
+                enabled: currentPage > 1,
+                onTap: () {
+                  setState(() => currentPage--);
+                  fetchSubscribers();
+                },
+              ),
+              Container(
+                margin:
+                    const EdgeInsets.symmetric(horizontal: 16),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 16, vertical: 7),
+                decoration: BoxDecoration(
+                  color: accentLight,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text('Page $currentPage',
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: accentColor)),
+              ),
+              _PageButton(
+                label: 'Next',
+                icon: Icons.chevron_right_rounded,
+                iconAfter: true,
+                enabled: hasMore,
+                onTap: () {
+                  setState(() => currentPage++);
+                  fetchSubscribers();
+                },
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Shared widgets ──────────────────────────────────────────────────────────
+
+const _hStyle = TextStyle(
+  fontSize: 12,
+  fontWeight: FontWeight.w600,
+  color: textSecondary,
+  letterSpacing: 0.4,
+);
+
+class _SummaryChip extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+  const _SummaryChip(
+      {required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label,
+              style: TextStyle(
+                  fontSize: 11,
+                  color: color,
+                  fontWeight: FontWeight.w500)),
+          const SizedBox(width: 4),
+          Text(value,
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: color)),
         ],
       ),
     );
   }
 }
 
-Widget _buildCellText(String text) {
-  return Text(
-    text,
-    style: GoogleFonts.notoSansBengali(
-      fontSize: 14,
-    ),
-    maxLines: 5,
-    textAlign: TextAlign.center,
-  );
+class _SubTypeBadge extends StatelessWidget {
+  final bool isPaid;
+  const _SubTypeBadge({required this.isPaid});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: isPaid
+            ? successColor.withValues(alpha: 0.1)
+            : errorColor.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isPaid
+              ? successColor.withValues(alpha: 0.3)
+              : errorColor.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Text(
+        isPaid ? 'PAID' : 'UNPAID',
+        style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: isPaid ? successColor : errorColor,
+            letterSpacing: 0.4),
+      ),
+    );
+  }
+}
+
+class _PageButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool enabled;
+  final bool iconAfter;
+  final VoidCallback onTap;
+
+  const _PageButton({
+    required this.label,
+    required this.icon,
+    required this.enabled,
+    required this.onTap,
+    this.iconAfter = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: enabled ? onTap : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: enabled ? surface : background,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+              color: enabled
+                  ? borderColor
+                  : borderColor.withValues(alpha: 0.5)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: iconAfter
+              ? [
+                  Text(label,
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: enabled ? textPrimary : textMuted)),
+                  const SizedBox(width: 4),
+                  Icon(icon,
+                      size: 18,
+                      color: enabled ? textPrimary : textMuted),
+                ]
+              : [
+                  Icon(icon,
+                      size: 18,
+                      color: enabled ? textPrimary : textMuted),
+                  const SizedBox(width: 4),
+                  Text(label,
+                      style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: enabled ? textPrimary : textMuted)),
+                ],
+        ),
+      ),
+    );
+  }
 }

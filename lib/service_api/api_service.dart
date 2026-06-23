@@ -11,6 +11,15 @@ class DashboardService {
       throw Exception("Failed to load stats");
     }
   }
+
+  static Future<Map<String, dynamic>> fetchOverviewStats() async {
+    final response = await http.get(Uri.parse("$host/api/overview-stats/"));
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception("Failed to load overview stats");
+    }
+  }
 }
 
 class DeactivationService {
