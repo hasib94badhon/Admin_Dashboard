@@ -1510,6 +1510,39 @@ class TermPolicyAPIView(APIView):
             return Response({"error": "TermPolicy with id=3 not found"}, status=status.HTTP_404_NOT_FOUND)
 
 
+class ContactInfoAPIView(APIView):
+    def get(self, request):
+        try:
+            info = ContactInfo.objects.get(id=1)
+            return Response({
+                "phone":    info.phone,
+                "email":    info.email,
+                "address":  info.address,
+                "website":  info.website,
+                "facebook": info.facebook,
+            }, status=status.HTTP_200_OK)
+        except ContactInfo.DoesNotExist:
+            return Response({"error": "Contact info not found"}, status=status.HTTP_404_NOT_FOUND)
+
+    def post(self, request):
+        try:
+            info, _ = ContactInfo.objects.get_or_create(id=1)
+            info.phone    = request.data.get("phone",    info.phone)
+            info.email    = request.data.get("email",    info.email)
+            info.address  = request.data.get("address",  info.address)
+            info.website  = request.data.get("website",  info.website)
+            info.facebook = request.data.get("facebook", info.facebook)
+            info.save()
+            return Response({
+                "phone":    info.phone,
+                "email":    info.email,
+                "address":  info.address,
+                "website":  info.website,
+                "facebook": info.facebook,
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 @api_view(['GET'])
 def overview_stats(request):
@@ -1715,3 +1748,89 @@ def insert_des_cat(request):
         return Response({"error": f"Topic '{des_cat_name}' already exists."}, status=409)
     topic = DesCat.objects.create(des_cat_name=des_cat_name, des_cat_status=1)
     return Response({"success": True, "des_cat_id": topic.des_cat_id, "des_cat_name": topic.des_cat_name}, status=201)
+
+
+# ── Des Sub Category CRUD ─────────────────────────────────────────────────────
+
+def _sub_cat_to_dict(s):
+    return {
+        "des_sub_cat_id": s.des_sub_cat_id,
+        "des_cat_id":     s.des_cat_id,
+        "name_bn":        s.name_bn,
+        "name_en":        s.name_en or '',
+        "emoji":          s.emoji or '',
+        "sort_order":     s.sort_order,
+    }
+
+
+@api_view(['GET'])
+def list_des_sub_categories(request):
+    """GET /api/des-sub-categories/?des_cat_id=X  — list all or by category."""
+    qs = DesSubCat.objects.all()
+    des_cat_id = request.query_params.get('des_cat_id')
+    if des_cat_id:
+        qs = qs.filter(des_cat_id=des_cat_id)
+    return Response({"success": True, "sub_categories": [_sub_cat_to_dict(s) for s in qs]})
+
+
+@api_view(['GET'])
+def list_des_categories_simple(request):
+    """GET /api/des-categories/ — for dropdown in admin panel."""
+    cats = DesCat.objects.all().values('des_cat_id', 'des_cat_name').order_by('des_cat_id')
+    return Response({"success": True, "categories": list(cats)})
+
+
+@api_view(['POST'])
+def create_des_sub_category(request):
+    """POST /api/des-sub-categories/create/"""
+    des_cat_id = request.data.get('des_cat_id')
+    name_bn    = (request.data.get('name_bn', '') or '').strip()
+    name_en    = (request.data.get('name_en', '') or '').strip()
+    emoji      = (request.data.get('emoji', '') or '').strip()
+    sort_order = int(request.data.get('sort_order', 0) or 0)
+
+    if not des_cat_id or not name_bn:
+        return Response({"error": "des_cat_id and name_bn are required."}, status=400)
+    try:
+        cat = DesCat.objects.get(pk=des_cat_id)
+    except DesCat.DoesNotExist:
+        return Response({"error": "Category not found."}, status=404)
+
+    if DesSubCat.objects.filter(des_cat_id=des_cat_id, name_bn__iexact=name_bn).exists():
+        return Response({"error": f"Sub-category '{name_bn}' already exists for this category."}, status=409)
+
+    sub = DesSubCat.objects.create(
+        des_cat=cat,
+        name_bn=name_bn,
+        name_en=name_en or None,
+        emoji=emoji or None,
+        sort_order=sort_order,
+    )
+    return Response({"success": True, "sub_category": _sub_cat_to_dict(sub)}, status=201)
+
+
+@api_view(['PUT'])
+def update_des_sub_category(request, pk):
+    """PUT /api/des-sub-categories/<pk>/update/"""
+    try:
+        sub = DesSubCat.objects.get(pk=pk)
+    except DesSubCat.DoesNotExist:
+        return Response({"error": "Not found."}, status=404)
+
+    sub.name_bn    = (request.data.get('name_bn', sub.name_bn) or '').strip() or sub.name_bn
+    sub.name_en    = (request.data.get('name_en', sub.name_en) or '').strip() or None
+    sub.emoji      = (request.data.get('emoji', sub.emoji) or '').strip() or None
+    sub.sort_order = int(request.data.get('sort_order', sub.sort_order) or sub.sort_order)
+    sub.save()
+    return Response({"success": True, "sub_category": _sub_cat_to_dict(sub)})
+
+
+@api_view(['DELETE'])
+def delete_des_sub_category(request, pk):
+    """DELETE /api/des-sub-categories/<pk>/delete/"""
+    try:
+        sub = DesSubCat.objects.get(pk=pk)
+    except DesSubCat.DoesNotExist:
+        return Response({"error": "Not found."}, status=404)
+    sub.delete()
+    return Response({"success": True, "message": "Deleted."})

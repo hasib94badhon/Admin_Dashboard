@@ -202,6 +202,21 @@ class DesCat(models.Model):
         db_table = 'des_cat'
 
 
+class DesSubCat(models.Model):
+    des_sub_cat_id = models.AutoField(primary_key=True)
+    des_cat        = models.ForeignKey(DesCat, on_delete=models.CASCADE,
+                                       db_column='des_cat_id', related_name='sub_cats')
+    name_bn        = models.CharField(max_length=120)
+    name_en        = models.CharField(max_length=120, blank=True, null=True)
+    emoji          = models.CharField(max_length=10, blank=True, null=True)
+    sort_order     = models.IntegerField(default=0)
+
+    class Meta:
+        managed = False
+        db_table = 'des_sub_cat'
+        ordering = ['des_cat_id', 'sort_order']
+
+
 class Description(models.Model):
     des_id = models.AutoField(primary_key=True)
     user_id = models.IntegerField()
@@ -419,6 +434,20 @@ class TermPolicy(models.Model):
     class Meta:
         managed = False
         db_table = 'term_policy'
+
+
+class ContactInfo(models.Model):
+    id       = models.IntegerField(primary_key=True, default=1)
+    phone    = models.CharField(max_length=50, blank=True, default='')
+    email    = models.CharField(max_length=100, blank=True, default='')
+    address  = models.CharField(max_length=255, blank=True, default='')
+    website  = models.CharField(max_length=255, blank=True, default='')
+    facebook = models.CharField(max_length=255, blank=True, default='')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed = False
+        db_table = 'contact_info'
 
 
 class ThoughtComment(models.Model):

@@ -13,6 +13,7 @@ import 'package:flutter_web_dashboard/pages/service/service.dart';
 import 'package:flutter_web_dashboard/pages/shop/shop.dart';
 import 'package:flutter_web_dashboard/pages/dataterms/terms.dart';
 import 'package:flutter_web_dashboard/pages/reactions/reactions_page.dart';
+import 'package:flutter_web_dashboard/pages/contact/contact_page.dart';
 
 Route<dynamic> generateRoute(RouteSettings settings) {
   switch (settings.name) {
@@ -42,6 +43,8 @@ Route<dynamic> generateRoute(RouteSettings settings) {
       return _getPageRoute(const TermsPage());
     case reactionsPageRoute:
       return _getPageRoute(const ReactionsPage());
+    case contactPageRoute:
+      return _getPageRoute(const ContactPage());
     default:
       return _getPageRoute(const OverviewPage());
   }

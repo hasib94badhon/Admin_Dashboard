@@ -40,6 +40,8 @@ const authenticationPageDisplayName = "Log out";
 const authenticationPageRoute = "/auth";
 const termsPageDisplayName = "Data Collector Instructions";
 const termsPageRoute = "/terms";
+const contactPageDisplayName = "Contact Info";
+const contactPageRoute = "/contact";
 
 class MenuItem {
   final String name;
@@ -63,4 +65,5 @@ List<MenuItem> sideMenuItemRoutes = [
   MenuItem(reactionsPageDisplayName, reactionsPageRoute),
   // MenuItem(authenticationPageDisplayName, authenticationPageRoute),
   MenuItem(termsPageDisplayName, termsPageRoute),
+  MenuItem(contactPageDisplayName, contactPageRoute),
 ];

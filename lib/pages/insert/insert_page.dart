@@ -30,6 +30,7 @@ class _InsertPageState extends State<InsertPage> {
     ('User', Icons.people_rounded),
     ('Category', Icons.category_rounded),
     ('Topic', Icons.topic_rounded),
+    ('Sub Category', Icons.subdirectory_arrow_right_rounded),
     ('Hotline Numbers', Icons.phone_rounded),
     ('Apps', Icons.apps_rounded),
     ('FB Page', Icons.facebook_rounded),
@@ -356,6 +357,8 @@ class _InsertPageState extends State<InsertPage> {
         return _buildCategoryCard();
       case 'Topic':
         return _buildTopicCard();
+      case 'Sub Category':
+        return const _SubCatManager();
       default:
         return const SizedBox.shrink();
     }
@@ -610,6 +613,527 @@ class _InsertPageState extends State<InsertPage> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Sub-Category Manager ───────────────────────────────────────────────────
+
+class _SubCatManager extends StatefulWidget {
+  const _SubCatManager();
+
+  @override
+  State<_SubCatManager> createState() => _SubCatManagerState();
+}
+
+class _SubCatManagerState extends State<_SubCatManager> {
+  List<Map<String, dynamic>> _categories = [];
+  List<Map<String, dynamic>> _subCats = [];
+  int? _filterCatId;
+  bool _loadingCats = true;
+  bool _loadingSubCats = false;
+  bool _isSaving = false;
+
+  // Add form
+  int? _formCatId;
+  final _nameBnCtrl = TextEditingController();
+  final _nameEnCtrl = TextEditingController();
+  final _emojiCtrl = TextEditingController();
+  final _sortCtrl = TextEditingController(text: '0');
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchCategories();
+  }
+
+  @override
+  void dispose() {
+    _nameBnCtrl.dispose();
+    _nameEnCtrl.dispose();
+    _emojiCtrl.dispose();
+    _sortCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchCategories() async {
+    setState(() => _loadingCats = true);
+    try {
+      final res = await http.get(Uri.parse('$host/api/des-categories/'));
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        setState(() => _categories = List<Map<String, dynamic>>.from(data['categories']));
+      }
+    } catch (_) {}
+    setState(() => _loadingCats = false);
+  }
+
+  Future<void> _fetchSubCats(int catId) async {
+    setState(() {
+      _loadingSubCats = true;
+      _filterCatId = catId;
+    });
+    try {
+      final res = await http.get(
+          Uri.parse('$host/api/des-sub-categories/?des_cat_id=$catId'));
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        setState(() =>
+            _subCats = List<Map<String, dynamic>>.from(data['sub_categories']));
+      }
+    } catch (_) {}
+    setState(() => _loadingSubCats = false);
+  }
+
+  Future<void> _create() async {
+    if (_formCatId == null || _nameBnCtrl.text.trim().isEmpty) {
+      _snack('Category and Bengali name are required.');
+      return;
+    }
+    setState(() => _isSaving = true);
+    try {
+      final res = await http.post(
+        Uri.parse('$host/api/des-sub-categories/create/'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'des_cat_id': _formCatId,
+          'name_bn': _nameBnCtrl.text.trim(),
+          'name_en': _nameEnCtrl.text.trim(),
+          'emoji': _emojiCtrl.text.trim(),
+          'sort_order': int.tryParse(_sortCtrl.text) ?? 0,
+        }),
+      );
+      final data = json.decode(res.body);
+      if (res.statusCode == 201) {
+        _snack('Sub-category created!', success: true);
+        _nameBnCtrl.clear();
+        _nameEnCtrl.clear();
+        _emojiCtrl.clear();
+        _sortCtrl.text = '0';
+        if (_filterCatId == _formCatId) _fetchSubCats(_formCatId!);
+      } else {
+        _snack(data['error'] ?? 'Failed to create.');
+      }
+    } catch (e) {
+      _snack('Error: $e');
+    }
+    setState(() => _isSaving = false);
+  }
+
+  Future<void> _delete(int id) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete Sub-Category'),
+        content: const Text('Are you sure you want to delete this sub-category?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: errorColor)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      final res = await http.delete(Uri.parse('$host/api/des-sub-categories/$id/delete/'));
+      if (res.statusCode == 200) {
+        _snack('Deleted.', success: true);
+        if (_filterCatId != null) _fetchSubCats(_filterCatId!);
+      } else {
+        _snack('Delete failed.');
+      }
+    } catch (e) {
+      _snack('Error: $e');
+    }
+  }
+
+  Future<void> _showEditDialog(Map<String, dynamic> sub) async {
+    final bnCtrl = TextEditingController(text: sub['name_bn'] ?? '');
+    final enCtrl = TextEditingController(text: sub['name_en'] ?? '');
+    final emCtrl = TextEditingController(text: sub['emoji'] ?? '');
+    final soCtrl = TextEditingController(text: '${sub['sort_order'] ?? 0}');
+    bool saving = false;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setDlg) {
+        return AlertDialog(
+          title: const Text('Edit Sub-Category'),
+          content: SizedBox(
+            width: 380,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _dlgField(bnCtrl, 'Bengali Name *'),
+                const SizedBox(height: 12),
+                _dlgField(enCtrl, 'English Name'),
+                const SizedBox(height: 12),
+                _dlgField(emCtrl, 'Emoji'),
+                const SizedBox(height: 12),
+                _dlgField(soCtrl, 'Sort Order', keyboardType: TextInputType.number),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: saving
+                  ? null
+                  : () async {
+                      setDlg(() => saving = true);
+                      try {
+                        final res = await http.put(
+                          Uri.parse('$host/api/des-sub-categories/${sub['des_sub_cat_id']}/update/'),
+                          headers: {'Content-Type': 'application/json'},
+                          body: json.encode({
+                            'name_bn': bnCtrl.text.trim(),
+                            'name_en': enCtrl.text.trim(),
+                            'emoji': emCtrl.text.trim(),
+                            'sort_order': int.tryParse(soCtrl.text) ?? 0,
+                          }),
+                        );
+                        if (res.statusCode == 200) {
+                          if (ctx.mounted) Navigator.pop(ctx);
+                          _snack('Updated!', success: true);
+                          if (_filterCatId != null) _fetchSubCats(_filterCatId!);
+                        } else {
+                          final d = json.decode(res.body);
+                          _snack(d['error'] ?? 'Update failed.');
+                        }
+                      } catch (e) {
+                        _snack('Error: $e');
+                      }
+                      setDlg(() => saving = false);
+                    },
+              style: ElevatedButton.styleFrom(backgroundColor: accentColor),
+              child: saving
+                  ? const SizedBox(
+                      width: 16, height: 16,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Text('Save', style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      }),
+    );
+    bnCtrl.dispose();
+    enCtrl.dispose();
+    emCtrl.dispose();
+    soCtrl.dispose();
+  }
+
+  Widget _dlgField(TextEditingController ctrl, String label,
+      {TextInputType keyboardType = TextInputType.text}) {
+    return TextField(
+      controller: ctrl,
+      keyboardType: keyboardType,
+      decoration: InputDecoration(
+        labelText: label,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      ),
+    );
+  }
+
+  void _snack(String msg, {bool success = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: success ? successColor : errorColor,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        // ── Add new sub-category form ─────────────────────────────
+        _FormCard(
+          title: 'Add Sub-Category',
+          icon: Icons.add_circle_outline_rounded,
+          child: _loadingCats
+              ? const Center(child: CircularProgressIndicator())
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Select a topic category, then enter sub-category details.',
+                      style: TextStyle(fontSize: 13, color: textSecondary),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Category dropdown
+                    const Text('Topic Category *',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textSecondary)),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<int>(
+                      value: _formCatId,
+                      decoration: InputDecoration(
+                        hintText: 'Select category',
+                        hintStyle: const TextStyle(color: textMuted, fontSize: 14),
+                        filled: true,
+                        fillColor: background,
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: borderColor)),
+                        enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: borderColor)),
+                        focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(color: accentColor, width: 1.5)),
+                      ),
+                      items: _categories
+                          .map((c) => DropdownMenuItem<int>(
+                                value: c['des_cat_id'] as int,
+                                child: Text(
+                                    '${c['des_cat_id']} · ${c['des_cat_name']}',
+                                    style: const TextStyle(fontSize: 14, color: textPrimary)),
+                              ))
+                          .toList(),
+                      onChanged: (v) => setState(() => _formCatId = v),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Bengali name
+                    const Text('Bengali Name *',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textSecondary)),
+                    const SizedBox(height: 8),
+                    _inputField(_nameBnCtrl, 'যেমন: সম্পত্তির বিজ্ঞাপন'),
+                    const SizedBox(height: 16),
+
+                    // English name + emoji in a row
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('English Name',
+                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textSecondary)),
+                              const SizedBox(height: 8),
+                              _inputField(_nameEnCtrl, 'e.g. Property Ads'),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 1,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Emoji',
+                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textSecondary)),
+                              const SizedBox(height: 8),
+                              _inputField(_emojiCtrl, '🏠'),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 1,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Sort',
+                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textSecondary)),
+                              const SizedBox(height: 8),
+                              _inputField(_sortCtrl, '0', keyboardType: TextInputType.number),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _isSaving ? null : _create,
+                        icon: _isSaving
+                            ? const SizedBox(
+                                width: 16, height: 16,
+                                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                            : const Icon(Icons.add_rounded, size: 18, color: Colors.white),
+                        label: Text(
+                          _isSaving ? 'Saving...' : 'Add Sub-Category',
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: accentColor,
+                          disabledBackgroundColor: accentColor.withValues(alpha: 0.5),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          elevation: 0,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+        ),
+
+        const SizedBox(height: 20),
+
+        // ── Sub-category list ─────────────────────────────────────
+        _FormCard(
+          title: 'Browse Sub-Categories',
+          icon: Icons.list_alt_rounded,
+          child: _loadingCats
+              ? const Center(child: CircularProgressIndicator())
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Filter dropdown
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DropdownButtonFormField<int>(
+                            value: _filterCatId,
+                            decoration: InputDecoration(
+                              hintText: 'Select category to load sub-cats',
+                              hintStyle: const TextStyle(color: textMuted, fontSize: 13),
+                              filled: true,
+                              fillColor: background,
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                              border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: const BorderSide(color: borderColor)),
+                              enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: const BorderSide(color: borderColor)),
+                              focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                  borderSide: const BorderSide(color: accentColor, width: 1.5)),
+                            ),
+                            items: _categories
+                                .map((c) => DropdownMenuItem<int>(
+                                      value: c['des_cat_id'] as int,
+                                      child: Text('${c['des_cat_id']} · ${c['des_cat_name']}',
+                                          style: const TextStyle(fontSize: 13, color: textPrimary)),
+                                    ))
+                                .toList(),
+                            onChanged: (v) {
+                              if (v != null) _fetchSubCats(v);
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    if (_loadingSubCats) ...[
+                      const SizedBox(height: 24),
+                      const Center(child: CircularProgressIndicator()),
+                    ] else if (_filterCatId != null && _subCats.isEmpty) ...[
+                      const SizedBox(height: 24),
+                      const Center(
+                        child: Text('No sub-categories found for this category.',
+                            style: TextStyle(fontSize: 13, color: textSecondary)),
+                      ),
+                    ] else if (_subCats.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      // Table header
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: accentColor.withValues(alpha: 0.06),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Row(
+                          children: [
+                            SizedBox(width: 40, child: Text('ID', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: textSecondary))),
+                            Expanded(flex: 3, child: Text('Bengali Name', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: textSecondary))),
+                            Expanded(flex: 2, child: Text('English Name', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: textSecondary))),
+                            SizedBox(width: 40, child: Text('Emoji', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: textSecondary))),
+                            SizedBox(width: 40, child: Text('Sort', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: textSecondary))),
+                            SizedBox(width: 80, child: Text('Actions', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: textSecondary))),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      ..._subCats.asMap().entries.map((e) {
+                        final i = e.key;
+                        final s = e.value;
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: i.isEven ? surface : background,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Row(
+                            children: [
+                              SizedBox(width: 40, child: Text('${s['des_sub_cat_id']}', style: const TextStyle(fontSize: 12, color: textMuted))),
+                              Expanded(flex: 3, child: Text(s['name_bn'] ?? '', style: const TextStyle(fontSize: 13, color: textPrimary))),
+                              Expanded(flex: 2, child: Text(s['name_en'] ?? '', style: const TextStyle(fontSize: 12, color: textSecondary))),
+                              SizedBox(width: 40, child: Text(s['emoji'] ?? '', style: const TextStyle(fontSize: 16))),
+                              SizedBox(width: 40, child: Text('${s['sort_order']}', style: const TextStyle(fontSize: 12, color: textMuted))),
+                              SizedBox(
+                                width: 80,
+                                child: Row(
+                                  children: [
+                                    InkWell(
+                                      onTap: () => _showEditDialog(s),
+                                      borderRadius: BorderRadius.circular(4),
+                                      child: const Padding(
+                                        padding: EdgeInsets.all(4),
+                                        child: Icon(Icons.edit_rounded, size: 16, color: accentColor),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    InkWell(
+                                      onTap: () => _delete(s['des_sub_cat_id'] as int),
+                                      borderRadius: BorderRadius.circular(4),
+                                      child: const Padding(
+                                        padding: EdgeInsets.all(4),
+                                        child: Icon(Icons.delete_outline_rounded, size: 16, color: errorColor),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+                  ],
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _inputField(TextEditingController ctrl, String hint,
+      {TextInputType keyboardType = TextInputType.text}) {
+    return TextField(
+      controller: ctrl,
+      keyboardType: keyboardType,
+      style: const TextStyle(fontSize: 14, color: textPrimary),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: textMuted, fontSize: 14),
+        filled: true,
+        fillColor: background,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: borderColor)),
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: borderColor)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: const BorderSide(color: accentColor, width: 1.5)),
       ),
     );
   }
