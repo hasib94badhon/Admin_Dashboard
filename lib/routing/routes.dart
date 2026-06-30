@@ -42,6 +42,8 @@ const termsPageDisplayName = "Data Collector Instructions";
 const termsPageRoute = "/terms";
 const contactPageDisplayName = "Contact Info";
 const contactPageRoute = "/contact";
+const notificationsPageDisplayName = "Notifications";
+const notificationsPageRoute = "/notifications";
 
 class MenuItem {
   final String name;
@@ -63,6 +65,7 @@ List<MenuItem> sideMenuItemRoutes = [
   MenuItem(shopPageDisplayName, shopPageRoute),
   MenuItem(subscriberPageDisplayName, subscriberPageRoute),
   MenuItem(reactionsPageDisplayName, reactionsPageRoute),
+  MenuItem(notificationsPageDisplayName, notificationsPageRoute),
   // MenuItem(authenticationPageDisplayName, authenticationPageRoute),
   MenuItem(termsPageDisplayName, termsPageRoute),
   MenuItem(contactPageDisplayName, contactPageRoute),

@@ -1834,3 +1834,285 @@ def delete_des_sub_category(request, pk):
         return Response({"error": "Not found."}, status=404)
     sub.delete()
     return Response({"success": True, "message": "Deleted."})
+
+
+# ════════════════════════════════════════════════════════════════════════════
+# Notification System
+# ════════════════════════════════════════════════════════════════════════════
+
+import json as _json
+import urllib.request as _urllib_req
+import urllib.error  as _urllib_err
+from django.conf import settings as _settings
+from .models import NotificationRule, BroadcastNotification, NotificationSendLog
+
+
+def _admin_key_required(view_func):
+    """Simple decorator: accept requests from the admin Flutter panel only."""
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
+
+def _parse_cat_ids(raw):
+    if not raw:
+        return []
+    try:
+        ids = _json.loads(raw)
+        return [int(x) for x in ids] if isinstance(ids, list) else []
+    except Exception:
+        return []
+
+
+def _cat_names_for_ids(cat_ids):
+    if not cat_ids:
+        return []
+    return list(Cat.objects.filter(cat_id__in=cat_ids).values_list('cat_name', flat=True))
+
+
+def _rule_to_dict(rule):
+    cat_ids   = _parse_cat_ids(rule.target_cat_ids)
+    cat_names = _cat_names_for_ids(cat_ids)
+    try:
+        dc  = DesCat.objects.get(des_cat_id=rule.des_cat_id)
+        dc_name = dc.des_cat_name
+    except Exception:
+        dc_name = ''
+    try:
+        dsc = DesSubCat.objects.get(des_sub_cat_id=rule.des_sub_cat_id)
+        dsc_name = dsc.name_bn or dsc.name_en or ''
+    except Exception:
+        dsc_name = '' if rule.des_sub_cat_id == 0 else str(rule.des_sub_cat_id)
+    return {
+        'rule_id':          rule.rule_id,
+        'rule_name':        rule.rule_name,
+        'des_cat_id':       rule.des_cat_id,
+        'des_cat_name':     dc_name,
+        'des_sub_cat_id':   rule.des_sub_cat_id,
+        'des_sub_cat_name': dsc_name,
+        'target_cat_ids':   cat_ids,
+        'target_cat_names': cat_names,
+        'is_active':        rule.is_active,
+        'created_at':       rule.created_at.isoformat() if rule.created_at else '',
+        'updated_at':       rule.updated_at.isoformat() if rule.updated_at else '',
+    }
+
+
+def _broadcast_to_dict(bc):
+    cat_ids   = _parse_cat_ids(bc.target_cat_ids)
+    cat_names = _cat_names_for_ids(cat_ids)
+    return {
+        'id':               bc.id,
+        'title':            bc.title,
+        'body':             bc.body,
+        'target_cat_ids':   cat_ids,
+        'target_cat_names': cat_names,
+        'sent_count':       bc.sent_count,
+        'failed_count':     bc.failed_count,
+        'status':           bc.status,
+        'created_by':       bc.created_by,
+        'sent_at':          bc.sent_at.isoformat() if bc.sent_at else None,
+        'created_at':       bc.created_at.isoformat() if bc.created_at else '',
+    }
+
+
+def _call_flask_admin(path, body_dict=None):
+    """POST to Flask admin endpoint with the shared admin secret key."""
+    base_url    = getattr(_settings, 'APP_BACKEND_URL', '')
+    admin_secret = getattr(_settings, 'APP_ADMIN_SECRET', '')
+    if not base_url:
+        raise ValueError('APP_BACKEND_URL not configured in Django settings')
+    url  = f"{base_url.rstrip('/')}{path}"
+    data = _json.dumps(body_dict or {}).encode()
+    req  = _urllib_req.Request(
+        url, data=data,
+        headers={'X-Admin-Key': admin_secret, 'Content-Type': 'application/json'},
+        method='POST',
+    )
+    with _urllib_req.urlopen(req, timeout=30) as resp:
+        return _json.loads(resp.read())
+
+
+# ── Notification Rules ───────────────────────────────────────────────────────
+
+@api_view(['GET'])
+def list_notification_rules(request):
+    rules = NotificationRule.objects.all().order_by('-rule_id')
+    return Response({'success': True, 'rules': [_rule_to_dict(r) for r in rules]})
+
+
+@api_view(['POST'])
+def create_notification_rule(request):
+    data           = request.data
+    rule_name      = (data.get('rule_name') or '').strip()
+    des_cat_id     = data.get('des_cat_id')
+    des_sub_cat_id = data.get('des_sub_cat_id', 0)
+    target_cat_ids = data.get('target_cat_ids', [])
+
+    if not rule_name or not des_cat_id:
+        return Response({'success': False,
+                         'message': 'rule_name and des_cat_id required'}, status=400)
+
+    rule = NotificationRule.objects.create(
+        rule_name      = rule_name,
+        des_cat_id     = int(des_cat_id),
+        des_sub_cat_id = int(des_sub_cat_id),
+        target_cat_ids = _json.dumps([int(x) for x in target_cat_ids]),
+        is_active      = True,
+    )
+    return Response({'success': True, 'rule_id': rule.rule_id}, status=201)
+
+
+@api_view(['PUT', 'PATCH'])
+def update_notification_rule(request, pk):
+    try:
+        rule = NotificationRule.objects.get(pk=pk)
+    except NotificationRule.DoesNotExist:
+        return Response({'success': False, 'message': 'Not found'}, status=404)
+
+    data = request.data
+    if 'rule_name'      in data: rule.rule_name      = data['rule_name']
+    if 'des_cat_id'     in data: rule.des_cat_id     = int(data['des_cat_id'])
+    if 'des_sub_cat_id' in data: rule.des_sub_cat_id = int(data['des_sub_cat_id'])
+    if 'is_active'      in data: rule.is_active      = bool(data['is_active'])
+    if 'target_cat_ids' in data:
+        rule.target_cat_ids = _json.dumps(
+            [int(x) for x in data['target_cat_ids']]
+        )
+    rule.save()
+    return Response({'success': True, 'rule': _rule_to_dict(rule)})
+
+
+@api_view(['DELETE'])
+def delete_notification_rule(request, pk):
+    try:
+        NotificationRule.objects.get(pk=pk).delete()
+    except NotificationRule.DoesNotExist:
+        return Response({'success': False, 'message': 'Not found'}, status=404)
+    return Response({'success': True})
+
+
+# ── Broadcasts ───────────────────────────────────────────────────────────────
+
+@api_view(['GET'])
+def list_broadcasts(request):
+    bcs = BroadcastNotification.objects.all().order_by('-id')[:100]
+    return Response({'success': True,
+                     'broadcasts': [_broadcast_to_dict(b) for b in bcs]})
+
+
+@api_view(['POST'])
+def create_broadcast(request):
+    data           = request.data
+    title          = (data.get('title') or '').strip()
+    body           = (data.get('body')  or '').strip()
+    target_cat_ids = data.get('target_cat_ids', [])
+    created_by     = (data.get('created_by') or 'admin').strip()
+
+    if not title or not body:
+        return Response({'success': False,
+                         'message': 'title and body required'}, status=400)
+
+    bc = BroadcastNotification.objects.create(
+        title          = title,
+        body           = body,
+        target_cat_ids = _json.dumps([int(x) for x in target_cat_ids]),
+        status         = 'draft',
+        created_by     = created_by,
+    )
+    return Response({'success': True, 'broadcast_id': bc.id}, status=201)
+
+
+@api_view(['POST'])
+def send_broadcast_view(request, pk):
+    try:
+        bc = BroadcastNotification.objects.get(pk=pk)
+    except BroadcastNotification.DoesNotExist:
+        return Response({'success': False, 'message': 'Not found'}, status=404)
+
+    if bc.status == 'sent':
+        return Response({'success': False, 'message': 'Already sent'}, status=400)
+
+    try:
+        result = _call_flask_admin(f'/admin/broadcasts/{pk}/send')
+        return Response({'success': True, **result})
+    except _urllib_err.HTTPError as e:
+        err_body = e.read().decode()
+        return Response({'success': False,
+                         'message': f'Flask error {e.code}: {err_body}'}, status=502)
+    except Exception as e:
+        return Response({'success': False, 'message': str(e)}, status=502)
+
+
+# ── Send Log ─────────────────────────────────────────────────────────────────
+
+@api_view(['GET'])
+def notification_send_logs(request):
+    page      = max(1, int(request.query_params.get('page', 1)))
+    page_size = min(100, max(1, int(request.query_params.get('page_size', 50))))
+    offset    = (page - 1) * page_size
+    logs = NotificationSendLog.objects.all().order_by('-sent_at')[offset:offset + page_size]
+    result = [
+        {
+            'log_id':       log.log_id,
+            'trigger_type': log.trigger_type,
+            'trigger_id':   log.trigger_id,
+            'triggered_by': log.triggered_by,
+            'rule_id':      log.rule_id,
+            'title':        log.title,
+            'body':         log.body,
+            'target_cats':  log.target_cats or '[]',
+            'sent_count':   log.sent_count,
+            'failed_count': log.failed_count,
+            'sent_at':      log.sent_at.isoformat() if log.sent_at else '',
+        }
+        for log in logs
+    ]
+    return Response({'success': True, 'logs': result, 'page': page})
+
+
+# ── Supporting dropdowns ─────────────────────────────────────────────────────
+
+@api_view(['GET'])
+def notification_des_categories(request):
+    cats = DesCat.objects.all().order_by('des_cat_id')
+    return Response({
+        'success': True,
+        'categories': [
+            {'des_cat_id': c.des_cat_id, 'des_cat_name': c.des_cat_name}
+            for c in cats
+        ],
+    })
+
+
+@api_view(['GET'])
+def notification_des_sub_categories(request):
+    des_cat_id = request.query_params.get('des_cat_id')
+    qs = DesSubCat.objects.all().order_by('des_cat_id', 'sort_order')
+    if des_cat_id:
+        qs = qs.filter(des_cat_id=int(des_cat_id))
+    return Response({
+        'success': True,
+        'sub_categories': [
+            {
+                'des_sub_cat_id': s.des_sub_cat_id,
+                'name':           s.name_bn or s.name_en or '',
+                'name_en':        s.name_en or '',
+                'emoji':          s.emoji   or '',
+            }
+            for s in qs
+        ],
+    })
+
+
+@api_view(['GET'])
+def notification_user_categories(request):
+    cats = Cat.objects.filter(status=True).order_by('cat_id')
+    return Response({
+        'success': True,
+        'categories': [
+            {'cat_id': c.cat_id, 'cat_name': c.cat_name}
+            for c in cats
+        ],
+    })

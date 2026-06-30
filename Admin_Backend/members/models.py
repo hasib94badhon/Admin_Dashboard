@@ -504,3 +504,65 @@ class ViewList(models.Model):
         managed = False
         db_table = 'view_list'
         unique_together = (('view_user_id', 'user_id'),)
+
+
+# ── Notification System ──────────────────────────────────────────────────────
+
+class NotificationRule(models.Model):
+    rule_id        = models.AutoField(primary_key=True)
+    rule_name      = models.CharField(max_length=255)
+    des_cat_id     = models.IntegerField()
+    des_sub_cat_id = models.IntegerField(default=0)
+    target_cat_ids = models.TextField(default='[]')
+    is_active      = models.BooleanField(default=True)
+    created_at     = models.DateTimeField(auto_now_add=True)
+    updated_at     = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        managed  = False
+        db_table = 'notification_rules'
+
+
+class BroadcastNotification(models.Model):
+    STATUS_CHOICES = [
+        ('draft',   'Draft'),
+        ('sending', 'Sending'),
+        ('sent',    'Sent'),
+        ('failed',  'Failed'),
+    ]
+    title          = models.CharField(max_length=255)
+    body           = models.TextField()
+    target_cat_ids = models.TextField(default='[]')
+    sent_count     = models.IntegerField(default=0)
+    failed_count   = models.IntegerField(default=0)
+    status         = models.CharField(max_length=20, choices=STATUS_CHOICES,
+                                      default='draft')
+    created_by     = models.CharField(max_length=100, default='admin')
+    sent_at        = models.DateTimeField(null=True, blank=True)
+    created_at     = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed  = False
+        db_table = 'broadcast_notifications'
+
+
+class NotificationSendLog(models.Model):
+    TRIGGER_CHOICES = [('post', 'Post'), ('broadcast', 'Broadcast'),
+                       ('new_user', 'New User')]
+    STATUS_CHOICES  = [('sent', 'Sent'), ('failed', 'Failed'),
+                       ('no_token', 'No Token')]
+    log_id        = models.AutoField(primary_key=True)
+    trigger_type  = models.CharField(max_length=20, choices=TRIGGER_CHOICES)
+    trigger_id    = models.IntegerField()
+    triggered_by  = models.IntegerField(default=0)
+    rule_id       = models.IntegerField(null=True, blank=True)
+    title         = models.CharField(max_length=255)
+    body          = models.TextField()
+    target_cats   = models.TextField(null=True, blank=True)
+    sent_count    = models.IntegerField(default=0)
+    failed_count  = models.IntegerField(default=0)
+    sent_at       = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed  = False
+        db_table = 'notification_send_log'

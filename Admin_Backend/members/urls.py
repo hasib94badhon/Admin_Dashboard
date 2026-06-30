@@ -44,7 +44,22 @@ urlpatterns = [
     path('api/des-sub-categories/<int:pk>/update/', update_des_sub_category, name='des-sub-categories-update'),
     path('api/des-sub-categories/<int:pk>/delete/', delete_des_sub_category, name='des-sub-categories-delete'),
 
+    # ── Notification System ─────────────────────────────────────────────────
+    path('api/notification-rules/',                list_notification_rules,       name='notif-rules-list'),
+    path('api/notification-rules/create/',         create_notification_rule,      name='notif-rules-create'),
+    path('api/notification-rules/<int:pk>/update/', update_notification_rule,     name='notif-rules-update'),
+    path('api/notification-rules/<int:pk>/delete/', delete_notification_rule,     name='notif-rules-delete'),
 
+    path('api/broadcasts/',                        list_broadcasts,               name='broadcasts-list'),
+    path('api/broadcasts/create/',                 create_broadcast,              name='broadcasts-create'),
+    path('api/broadcasts/<int:pk>/send/',          send_broadcast_view,           name='broadcasts-send'),
+
+    path('api/notification-logs/',                 notification_send_logs,        name='notif-logs'),
+
+    # Dropdowns for the notification rule builder
+    path('api/notif/des-categories/',              notification_des_categories,      name='notif-des-cats'),
+    path('api/notif/des-sub-categories/',          notification_des_sub_categories,  name='notif-des-subcats'),
+    path('api/notif/user-categories/',             notification_user_categories,     name='notif-user-cats'),
 ]
 
 if settings.DEBUG:

@@ -121,6 +121,10 @@ DATABASES = {
     }
 }
 
+# Flask app backend — used by Django to delegate FCM dispatch
+APP_BACKEND_URL  = config('APP_BACKEND_URL',  default='https://try.aarambd.com/api')
+APP_ADMIN_SECRET = config('APP_ADMIN_SECRET', default='')
+
 
 
 # Password validation
