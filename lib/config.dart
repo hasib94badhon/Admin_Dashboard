@@ -1,6 +1,10 @@
 import 'package:intl/intl.dart';
 
 final String host = 'https://control.aarambd.com';
+// Flask API base — used for individual FB page / YT channel admin CRUD
+const String flaskApi = 'https://try.aarambd.com/api';
+// Must match ADMIN_SECRET_KEY in Flask config
+const String flaskAdminKey = 'aarambd_admin_notify_2025_secret';
 //final String host = 'http://127.0.0.1:8000';
 
 class NumberFormatter {

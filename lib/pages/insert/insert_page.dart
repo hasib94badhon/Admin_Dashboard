@@ -7,6 +7,13 @@ import 'package:universal_html/html.dart' as html;
 import 'package:flutter_web_dashboard/config.dart';
 import 'package:flutter_web_dashboard/constants/style.dart';
 
+// ── Flask admin helpers ───────────────────────────────────────────────────────
+
+Map<String, String> get _adminHeaders => {
+      'Content-Type': 'application/json',
+      'X-Admin-Key': flaskAdminKey,
+    };
+
 class InsertPage extends StatefulWidget {
   const InsertPage({Key? key}) : super(key: key);
 
@@ -34,6 +41,8 @@ class _InsertPageState extends State<InsertPage> {
     ('Hotline Numbers', Icons.phone_rounded),
     ('Apps', Icons.apps_rounded),
     ('FB Page', Icons.facebook_rounded),
+    ('FB Page (Single)', Icons.add_box_rounded),
+    ('YouTube Channel', Icons.smart_display_rounded),
   ];
 
   Future<void> pickExcelFile() async {
@@ -353,6 +362,10 @@ class _InsertPageState extends State<InsertPage> {
           onPick: pickExcelFile,
           onUpload: uploadFbPages,
         );
+      case 'FB Page (Single)':
+        return const _FbSingleManager();
+      case 'YouTube Channel':
+        return const _YtChannelManager();
       case 'Category':
         return _buildCategoryCard();
       case 'Topic':
@@ -828,6 +841,140 @@ class _SubCatManagerState extends State<_SubCatManager> {
     soCtrl.dispose();
   }
 
+  Future<List<Map<String, dynamic>>> _fetchSuggestionsFor(int subCatId) async {
+    try {
+      final res = await http.get(
+          Uri.parse('$host/api/des-cat-suggestions/?des_sub_cat_id=$subCatId'));
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        return List<Map<String, dynamic>>.from(data['suggestions']);
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  Future<void> _showSuggestionsDialog(Map<String, dynamic> sub) async {
+    final subCatId = sub['des_sub_cat_id'] as int;
+    final addCtrl = TextEditingController();
+    List<Map<String, dynamic>> suggestions = await _fetchSuggestionsFor(subCatId);
+    bool saving = false;
+    if (!mounted) return;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(builder: (ctx, setDlg) {
+        Future<void> reload() async {
+          final fresh = await _fetchSuggestionsFor(subCatId);
+          setDlg(() => suggestions = fresh);
+        }
+
+        Future<void> add() async {
+          final text = addCtrl.text.trim();
+          if (text.isEmpty) return;
+          setDlg(() => saving = true);
+          try {
+            final res = await http.post(
+              Uri.parse('$host/api/des-cat-suggestions/create/'),
+              headers: {'Content-Type': 'application/json'},
+              body: json.encode({
+                'des_sub_cat_id': subCatId,
+                'suggestion_text': text,
+                'sort_order': suggestions.length,
+              }),
+            );
+            if (res.statusCode == 201) {
+              addCtrl.clear();
+              await reload();
+            } else {
+              _snack('Failed to add suggestion.');
+            }
+          } catch (e) {
+            _snack('Error: $e');
+          }
+          setDlg(() => saving = false);
+        }
+
+        Future<void> removeOne(int id) async {
+          try {
+            final res = await http
+                .delete(Uri.parse('$host/api/des-cat-suggestions/$id/delete/'));
+            if (res.statusCode == 200) {
+              await reload();
+            } else {
+              _snack('Delete failed.');
+            }
+          } catch (e) {
+            _snack('Error: $e');
+          }
+        }
+
+        return AlertDialog(
+          title: Text('Suggestions — ${sub['name_bn'] ?? ''}'),
+          content: SizedBox(
+            width: 420,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(child: _dlgField(addCtrl, 'New suggestion text')),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: saving ? null : add,
+                      style: ElevatedButton.styleFrom(backgroundColor: accentColor),
+                      child: saving
+                          ? const SizedBox(
+                              width: 16, height: 16,
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2))
+                          : const Text('Add', style: TextStyle(color: Colors.white)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                if (suggestions.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 20),
+                    child: Center(
+                        child: Text('No suggestions yet.',
+                            style: TextStyle(color: textMuted))),
+                  )
+                else
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxHeight: 280),
+                    child: ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: suggestions.length,
+                      separatorBuilder: (_, __) => const Divider(height: 1),
+                      itemBuilder: (_, i) {
+                        final s = suggestions[i];
+                        return ListTile(
+                          dense: true,
+                          title: Text(s['suggestion_text'] ?? '',
+                              style: const TextStyle(fontSize: 13)),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete_outline_rounded,
+                                size: 18, color: errorColor),
+                            onPressed: () => removeOne(s['id'] as int),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
+          ],
+        );
+      }),
+    );
+    addCtrl.dispose();
+  }
+
   Widget _dlgField(TextEditingController ctrl, String label,
       {TextInputType keyboardType = TextInputType.text}) {
     return TextField(
@@ -1056,7 +1203,7 @@ class _SubCatManagerState extends State<_SubCatManager> {
                             Expanded(flex: 2, child: Text('English Name', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: textSecondary))),
                             SizedBox(width: 40, child: Text('Emoji', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: textSecondary))),
                             SizedBox(width: 40, child: Text('Sort', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: textSecondary))),
-                            SizedBox(width: 80, child: Text('Actions', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: textSecondary))),
+                            SizedBox(width: 108, child: Text('Actions', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: textSecondary))),
                           ],
                         ),
                       ),
@@ -1078,9 +1225,18 @@ class _SubCatManagerState extends State<_SubCatManager> {
                               SizedBox(width: 40, child: Text(s['emoji'] ?? '', style: const TextStyle(fontSize: 16))),
                               SizedBox(width: 40, child: Text('${s['sort_order']}', style: const TextStyle(fontSize: 12, color: textMuted))),
                               SizedBox(
-                                width: 80,
+                                width: 108,
                                 child: Row(
                                   children: [
+                                    InkWell(
+                                      onTap: () => _showSuggestionsDialog(s),
+                                      borderRadius: BorderRadius.circular(4),
+                                      child: const Padding(
+                                        padding: EdgeInsets.all(4),
+                                        child: Icon(Icons.auto_awesome_rounded, size: 16, color: accentColor),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
                                     InkWell(
                                       onTap: () => _showEditDialog(s),
                                       borderRadius: BorderRadius.circular(4),
@@ -1462,6 +1618,612 @@ class _SummaryTile extends StatelessWidget {
     );
   }
 }
+
+// ── FB Page single-insert manager ─────────────────────────────────────────
+
+class _FbSingleManager extends StatefulWidget {
+  const _FbSingleManager();
+  @override
+  State<_FbSingleManager> createState() => _FbSingleManagerState();
+}
+
+class _FbSingleManagerState extends State<_FbSingleManager> {
+  final _name     = TextEditingController();
+  final _cat      = TextEditingController();
+  final _photo    = TextEditingController();
+  final _link     = TextEditingController();
+  final _phone    = TextEditingController();
+  final _location = TextEditingController();
+
+  bool _saving = false;
+  bool _loadingList = false;
+  List<Map<String, dynamic>> _pages = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchList();
+  }
+
+  @override
+  void dispose() {
+    for (final c in [_name, _cat, _photo, _link, _phone, _location]) c.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchList() async {
+    setState(() => _loadingList = true);
+    try {
+      final res = await http.get(
+        Uri.parse('$flaskApi/admin/fb_pages'),
+        headers: _adminHeaders,
+      );
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        setState(() => _pages = List<Map<String, dynamic>>.from(data['fb_pages']));
+      }
+    } catch (_) {}
+    setState(() => _loadingList = false);
+  }
+
+  Future<void> _submit() async {
+    if (_name.text.trim().isEmpty || _cat.text.trim().isEmpty || _link.text.trim().isEmpty) {
+      _snack('Name, category, and link are required.');
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      final res = await http.post(
+        Uri.parse('$flaskApi/admin/fb_page/add'),
+        headers: _adminHeaders,
+        body: json.encode({
+          'name': _name.text.trim(),
+          'cat': _cat.text.trim(),
+          'photo': _photo.text.trim(),
+          'link': _link.text.trim(),
+          'phone': _phone.text.trim(),
+          'location': _location.text.trim(),
+        }),
+      );
+      if (res.statusCode == 201) {
+        _snack('Facebook page added!', success: true);
+        for (final c in [_name, _cat, _photo, _link, _phone, _location]) c.clear();
+        _fetchList();
+      } else {
+        final d = json.decode(res.body);
+        _snack(d['error'] ?? 'Failed to add page.');
+      }
+    } catch (e) {
+      _snack('Error: $e');
+    }
+    setState(() => _saving = false);
+  }
+
+  Future<void> _delete(int pageId) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete Page'),
+        content: const Text('Remove this Facebook page?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: errorColor)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      final res = await http.delete(
+        Uri.parse('$flaskApi/admin/fb_page/$pageId'),
+        headers: _adminHeaders,
+      );
+      if (res.statusCode == 200) {
+        _snack('Deleted.', success: true);
+        _fetchList();
+      } else {
+        _snack('Delete failed.');
+      }
+    } catch (e) {
+      _snack('Error: $e');
+    }
+  }
+
+  void _snack(String msg, {bool success = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: success ? successColor : errorColor,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(children: [
+      _FormCard(
+        title: 'Add Facebook Page',
+        icon: Icons.facebook_rounded,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Add an individual Facebook page to the directory.',
+              style: TextStyle(fontSize: 13, color: textSecondary)),
+          const SizedBox(height: 20),
+          Row(children: [
+            Expanded(child: _field(_name, 'Page Name *')),
+            const SizedBox(width: 12),
+            Expanded(child: _field(_cat, 'Category *', hint: 'e.g. News, Entertainment')),
+          ]),
+          const SizedBox(height: 12),
+          _field(_link, 'Facebook Page Link *', hint: 'https://facebook.com/pagename'),
+          const SizedBox(height: 12),
+          _field(_photo, 'Profile Photo URL', hint: 'https://...'),
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(child: _field(_phone, 'Phone (optional)')),
+            const SizedBox(width: 12),
+            Expanded(child: _field(_location, 'Location (optional)')),
+          ]),
+          const SizedBox(height: 20),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              onPressed: _saving ? null : _submit,
+              icon: _saving
+                  ? const SizedBox(width: 16, height: 16,
+                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Icon(Icons.add_rounded, size: 18, color: Colors.white),
+              label: Text(_saving ? 'Adding...' : 'Add Facebook Page',
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF1877F2),
+                disabledBackgroundColor: const Color(0xFF1877F2).withValues(alpha: 0.5),
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                elevation: 0,
+              ),
+            ),
+          ),
+        ]),
+      ),
+      const SizedBox(height: 20),
+      _FormCard(
+        title: 'Existing Facebook Pages',
+        icon: Icons.list_alt_rounded,
+        child: _loadingList
+            ? const Center(child: CircularProgressIndicator())
+            : _pages.isEmpty
+                ? const Text('No pages yet.', style: TextStyle(color: textSecondary, fontSize: 13))
+                : Column(children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: accentColor.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Row(children: [
+                        Expanded(flex: 3, child: Text('Name', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: textSecondary))),
+                        Expanded(flex: 2, child: Text('Category', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: textSecondary))),
+                        SizedBox(width: 60, child: Text('Visits', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: textSecondary))),
+                        SizedBox(width: 50, child: Text('', style: TextStyle(fontSize: 11))),
+                      ]),
+                    ),
+                    const SizedBox(height: 4),
+                    ..._pages.asMap().entries.map((e) {
+                      final i = e.key;
+                      final p = e.value;
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: i.isEven ? surface : background,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(children: [
+                          Expanded(flex: 3, child: Text(p['name'] ?? '', style: const TextStyle(fontSize: 13, color: textPrimary), overflow: TextOverflow.ellipsis)),
+                          Expanded(flex: 2, child: Text(p['cat'] ?? '', style: const TextStyle(fontSize: 12, color: textSecondary), overflow: TextOverflow.ellipsis)),
+                          SizedBox(width: 60, child: Text('${p['visit_count'] ?? 0}', style: const TextStyle(fontSize: 12, color: textMuted))),
+                          SizedBox(
+                            width: 50,
+                            child: InkWell(
+                              onTap: () => _delete(p['page_id'] as int),
+                              borderRadius: BorderRadius.circular(4),
+                              child: const Padding(
+                                padding: EdgeInsets.all(4),
+                                child: Icon(Icons.delete_outline_rounded, size: 16, color: errorColor),
+                              ),
+                            ),
+                          ),
+                        ]),
+                      );
+                    }),
+                  ]),
+      ),
+    ]);
+  }
+
+  Widget _field(TextEditingController ctrl, String label,
+      {String? hint, TextInputType keyboardType = TextInputType.text}) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textSecondary)),
+      const SizedBox(height: 6),
+      TextField(
+        controller: ctrl,
+        keyboardType: keyboardType,
+        style: const TextStyle(fontSize: 14, color: textPrimary),
+        decoration: InputDecoration(
+          hintText: hint ?? label.replaceAll(' *', ''),
+          hintStyle: const TextStyle(color: textMuted, fontSize: 13),
+          filled: true,
+          fillColor: background,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: borderColor)),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: borderColor)),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: accentColor, width: 1.5)),
+        ),
+      ),
+    ]);
+  }
+}
+
+
+// ── YouTube Channel manager ────────────────────────────────────────────────
+
+class _YtChannelManager extends StatefulWidget {
+  const _YtChannelManager();
+  @override
+  State<_YtChannelManager> createState() => _YtChannelManagerState();
+}
+
+class _YtChannelManagerState extends State<_YtChannelManager>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabs;
+
+  // Single add
+  final _name  = TextEditingController();
+  final _cat   = TextEditingController();
+  final _photo = TextEditingController();
+  final _link  = TextEditingController();
+  bool _saving = false;
+
+  // Bulk add (JSON paste)
+  final _bulkCtrl = TextEditingController();
+  bool _bulkSaving = false;
+  Map<String, dynamic>? _bulkResult;
+
+  // List
+  bool _loadingList = false;
+  List<Map<String, dynamic>> _channels = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _tabs = TabController(length: 2, vsync: this);
+    _fetchList();
+  }
+
+  @override
+  void dispose() {
+    _tabs.dispose();
+    for (final c in [_name, _cat, _photo, _link, _bulkCtrl]) c.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchList() async {
+    setState(() => _loadingList = true);
+    try {
+      final res = await http.get(
+        Uri.parse('$flaskApi/admin/yt_channels'),
+        headers: _adminHeaders,
+      );
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        setState(() => _channels = List<Map<String, dynamic>>.from(data['yt_channels']));
+      }
+    } catch (_) {}
+    setState(() => _loadingList = false);
+  }
+
+  Future<void> _submit() async {
+    if (_name.text.trim().isEmpty || _cat.text.trim().isEmpty || _link.text.trim().isEmpty) {
+      _snack('Name, category, and link are required.');
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      final res = await http.post(
+        Uri.parse('$flaskApi/admin/yt_channel/add'),
+        headers: _adminHeaders,
+        body: json.encode({
+          'name':  _name.text.trim(),
+          'cat':   _cat.text.trim(),
+          'photo': _photo.text.trim(),
+          'link':  _link.text.trim(),
+        }),
+      );
+      if (res.statusCode == 201) {
+        _snack('YouTube channel added!', success: true);
+        for (final c in [_name, _cat, _photo, _link]) c.clear();
+        _fetchList();
+      } else {
+        final d = json.decode(res.body);
+        _snack(d['error'] ?? 'Failed to add channel.');
+      }
+    } catch (e) {
+      _snack('Error: $e');
+    }
+    setState(() => _saving = false);
+  }
+
+  Future<void> _submitBulk() async {
+    final raw = _bulkCtrl.text.trim();
+    if (raw.isEmpty) { _snack('Paste the JSON array first.'); return; }
+    List<dynamic> items;
+    try {
+      items = json.decode(raw) as List;
+    } catch (_) {
+      _snack('Invalid JSON. Expected a list like [ {"name":"...", "cat":"...", "link":"..."}, ...]');
+      return;
+    }
+    setState(() { _bulkSaving = true; _bulkResult = null; });
+    try {
+      final res = await http.post(
+        Uri.parse('$flaskApi/admin/yt_channel/bulk'),
+        headers: _adminHeaders,
+        body: json.encode({'channels': items}),
+      );
+      final d = json.decode(res.body);
+      if (res.statusCode == 201) {
+        setState(() => _bulkResult = d);
+        _snack('Bulk import done!', success: true);
+        _fetchList();
+      } else {
+        _snack(d['error'] ?? 'Bulk import failed.');
+      }
+    } catch (e) {
+      _snack('Error: $e');
+    }
+    setState(() => _bulkSaving = false);
+  }
+
+  Future<void> _delete(int channelId) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Delete Channel'),
+        content: const Text('Remove this YouTube channel?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: errorColor)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      final res = await http.delete(
+        Uri.parse('$flaskApi/admin/yt_channel/$channelId'),
+        headers: _adminHeaders,
+      );
+      if (res.statusCode == 200) {
+        _snack('Deleted.', success: true);
+        _fetchList();
+      } else {
+        _snack('Delete failed.');
+      }
+    } catch (e) {
+      _snack('Error: $e');
+    }
+  }
+
+  void _snack(String msg, {bool success = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(msg),
+      backgroundColor: success ? successColor : errorColor,
+      behavior: SnackBarBehavior.floating,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(children: [
+      _FormCard(
+        title: 'YouTube Channel Manager',
+        icon: Icons.smart_display_rounded,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          TabBar(
+            controller: _tabs,
+            indicatorColor: const Color(0xFFFF0000),
+            labelColor: const Color(0xFFFF0000),
+            unselectedLabelColor: textSecondary,
+            labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+            tabs: const [Tab(text: 'Add Single'), Tab(text: 'Bulk Import (JSON)')],
+          ),
+          const SizedBox(height: 20),
+          SizedBox(
+            height: 320,
+            child: TabBarView(controller: _tabs, children: [
+              // ── Single add ──
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  Expanded(child: _field(_name, 'Channel Name *')),
+                  const SizedBox(width: 12),
+                  Expanded(child: _field(_cat, 'Category *', hint: 'e.g. News, Music')),
+                ]),
+                const SizedBox(height: 12),
+                _field(_link, 'Channel Link *', hint: 'https://youtube.com/@channelname'),
+                const SizedBox(height: 12),
+                _field(_photo, 'Profile Photo URL', hint: 'https://...'),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: _saving ? null : _submit,
+                    icon: _saving
+                        ? const SizedBox(width: 16, height: 16,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Icon(Icons.add_rounded, size: 18, color: Colors.white),
+                    label: Text(_saving ? 'Adding...' : 'Add Channel',
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFF0000),
+                      disabledBackgroundColor: const Color(0xFFFF0000).withValues(alpha: 0.5),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      elevation: 0,
+                    ),
+                  ),
+                ),
+              ]),
+
+              // ── Bulk JSON ──
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFBEB),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: warningColor.withValues(alpha: 0.4)),
+                  ),
+                  child: const Text(
+                    'Paste a JSON array:\n'
+                    '[ {"name":"BTV News","cat":"News","link":"https://youtube.com/@btv","photo":""},\n'
+                    '  {"name":"Channel 24","cat":"News","link":"https://youtube.com/@ch24"} ]',
+                    style: TextStyle(fontSize: 11, color: Color(0xFF92400E), fontFamily: 'monospace'),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Expanded(
+                  child: TextField(
+                    controller: _bulkCtrl,
+                    maxLines: null,
+                    expands: true,
+                    style: const TextStyle(fontSize: 12, fontFamily: 'monospace', color: textPrimary),
+                    decoration: InputDecoration(
+                      hintText: '[ { "name": "...", "cat": "...", "link": "..." }, ... ]',
+                      hintStyle: const TextStyle(color: textMuted, fontSize: 12),
+                      filled: true,
+                      fillColor: background,
+                      contentPadding: const EdgeInsets.all(12),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: borderColor)),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: borderColor)),
+                      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: accentColor, width: 1.5)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: _bulkSaving ? null : _submitBulk,
+                      icon: _bulkSaving
+                          ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                          : const Icon(Icons.upload_rounded, size: 18, color: Colors.white),
+                      label: Text(_bulkSaving ? 'Importing...' : 'Import Channels',
+                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFFF0000),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        elevation: 0,
+                      ),
+                    ),
+                  ),
+                  if (_bulkResult != null) ...[
+                    const SizedBox(width: 12),
+                    Text('✓ Added: ${_bulkResult!['added']}  Skipped: ${_bulkResult!['skipped']}',
+                        style: const TextStyle(fontSize: 13, color: successColor, fontWeight: FontWeight.w700)),
+                  ],
+                ]),
+              ]),
+            ]),
+          ),
+        ]),
+      ),
+      const SizedBox(height: 20),
+      _FormCard(
+        title: 'Existing YouTube Channels',
+        icon: Icons.list_alt_rounded,
+        child: _loadingList
+            ? const Center(child: CircularProgressIndicator())
+            : _channels.isEmpty
+                ? const Text('No channels yet.', style: TextStyle(color: textSecondary, fontSize: 13))
+                : Column(children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: accentColor.withValues(alpha: 0.06),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Row(children: [
+                        Expanded(flex: 3, child: Text('Name', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: textSecondary))),
+                        Expanded(flex: 2, child: Text('Category', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: textSecondary))),
+                        SizedBox(width: 60, child: Text('Visits', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: textSecondary))),
+                        SizedBox(width: 50),
+                      ]),
+                    ),
+                    const SizedBox(height: 4),
+                    ..._channels.asMap().entries.map((e) {
+                      final i = e.key;
+                      final ch = e.value;
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: i.isEven ? surface : background,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(children: [
+                          Expanded(flex: 3, child: Text(ch['name'] ?? '', style: const TextStyle(fontSize: 13, color: textPrimary), overflow: TextOverflow.ellipsis)),
+                          Expanded(flex: 2, child: Text(ch['cat'] ?? '', style: const TextStyle(fontSize: 12, color: textSecondary), overflow: TextOverflow.ellipsis)),
+                          SizedBox(width: 60, child: Text('${ch['visit_count'] ?? 0}', style: const TextStyle(fontSize: 12, color: textMuted))),
+                          SizedBox(
+                            width: 50,
+                            child: InkWell(
+                              onTap: () => _delete(ch['channel_id'] as int),
+                              borderRadius: BorderRadius.circular(4),
+                              child: const Padding(
+                                padding: EdgeInsets.all(4),
+                                child: Icon(Icons.delete_outline_rounded, size: 16, color: errorColor),
+                              ),
+                            ),
+                          ),
+                        ]),
+                      );
+                    }),
+                  ]),
+      ),
+    ]);
+  }
+
+  Widget _field(TextEditingController ctrl, String label,
+      {String? hint, TextInputType keyboardType = TextInputType.text}) {
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textSecondary)),
+      const SizedBox(height: 6),
+      TextField(
+        controller: ctrl,
+        keyboardType: keyboardType,
+        style: const TextStyle(fontSize: 14, color: textPrimary),
+        decoration: InputDecoration(
+          hintText: hint ?? label.replaceAll(' *', ''),
+          hintStyle: const TextStyle(color: textMuted, fontSize: 13),
+          filled: true,
+          fillColor: background,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: borderColor)),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: borderColor)),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: accentColor, width: 1.5)),
+        ),
+      ),
+    ]);
+  }
+}
+
 
 // ── Shared card wrapper ────────────────────────────────────────────────────
 

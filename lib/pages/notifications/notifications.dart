@@ -333,49 +333,79 @@ class _AddRuleDialog extends StatefulWidget {
 }
 
 class _AddRuleDialogState extends State<_AddRuleDialog> {
-  final _nameCtrl = TextEditingController();
-  List<dynamic> _desCats    = [];
-  List<dynamic> _desSubs    = [];
-  List<dynamic> _userCats   = [];
-  int?          _selDesCat;
-  int           _selDesSub  = 0;
-  final Set<int> _selUserCats = {};
-  bool          _saving     = false;
-  String?       _err;
+  final _nameCtrl   = TextEditingController();
+  final _searchCtrl = TextEditingController();
+
+  List<dynamic>  _desCats      = [];
+  List<dynamic>  _desSubs      = [];
+  List<dynamic>  _userCats     = [];
+  List<dynamic>  _filteredCats = [];
+  int?           _selDesCat;
+  int            _selDesSub    = 0;
+  final Set<int> _selUserCats  = {};
+  bool           _saving       = false;
+  bool           _subsLoading  = false;
+  String?        _err;
 
   @override
   void initState() {
     super.initState();
     _loadDropdowns();
+    _searchCtrl.addListener(_filterCats);
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _searchCtrl.dispose();
+    super.dispose();
   }
 
   Future<void> _loadDropdowns() async {
     final desCats  = await NotificationAdminService.fetchDesCategories();
     final userCats = await NotificationAdminService.fetchUserCategories();
-    if (mounted) setState(() { _desCats = desCats; _userCats = userCats; });
+    if (mounted) {
+      setState(() {
+        _desCats      = desCats;
+        _userCats     = userCats;
+        _filteredCats = userCats;
+      });
+    }
+  }
+
+  void _filterCats() {
+    final q = _searchCtrl.text.trim().toLowerCase();
+    setState(() {
+      _filteredCats = q.isEmpty
+          ? _userCats
+          : _userCats.where((c) =>
+              (c['cat_name'] as String).toLowerCase().contains(q)).toList();
+    });
   }
 
   Future<void> _onDesCatChanged(int? id) async {
-    setState(() { _selDesCat = id; _desSubs = []; _selDesSub = 0; });
+    setState(() { _selDesCat = id; _desSubs = []; _selDesSub = 0; _subsLoading = true; });
     if (id != null) {
       final subs = await NotificationAdminService.fetchDesSubCategories(id);
-      if (mounted) setState(() => _desSubs = subs);
+      if (mounted) setState(() { _desSubs = subs; _subsLoading = false; });
+    } else {
+      setState(() => _subsLoading = false);
     }
   }
 
   Future<void> _save() async {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty || _selDesCat == null) {
-      setState(() => _err = 'Rule name and category are required');
+      setState(() => _err = 'Rule name and post category are required.');
       return;
     }
     setState(() { _saving = true; _err = null; });
     try {
       await NotificationAdminService.createRule(
-        ruleName:      name,
-        desCatId:      _selDesCat!,
-        desSubCatId:   _selDesSub,
-        targetCatIds:  _selUserCats.toList(),
+        ruleName:     name,
+        desCatId:     _selDesCat!,
+        desSubCatId:  _selDesSub,
+        targetCatIds: _selUserCats.toList(),
       );
       if (mounted) {
         Navigator.of(context).pop();
@@ -386,107 +416,474 @@ class _AddRuleDialogState extends State<_AddRuleDialog> {
     }
   }
 
+  String get _selDesCatName {
+    if (_selDesCat == null) return '';
+    final c = _desCats.firstWhere(
+        (c) => c['des_cat_id'] == _selDesCat, orElse: () => null);
+    return c?['des_cat_name'] ?? '';
+  }
+
+  String get _selDesSubName {
+    if (_selDesSub == 0) return 'সব সাব-ক্যাটাগরি';
+    final s = _desSubs.firstWhere(
+        (s) => s['des_sub_cat_id'] == _selDesSub, orElse: () => null);
+    if (s == null) return '';
+    return '${s['emoji'] ?? ''} ${s['name'] ?? ''}'.trim();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Add Notification Rule',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      content: SizedBox(
-        width: 480,
-        child: SingleChildScrollView(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _FieldLabel('Rule Name'),
-              TextField(
-                controller: _nameCtrl,
-                decoration: _inputDeco('e.g. বিক্রয় → Service Providers'),
-              ),
-              const SizedBox(height: 16),
-              _FieldLabel('Post Category (des_cat)'),
-              DropdownButtonFormField<int>(
-                initialValue: _selDesCat,
-                hint: const Text('Select category'),
-                decoration: _inputDeco(null),
-                items: _desCats.map<DropdownMenuItem<int>>((c) {
-                  return DropdownMenuItem(
-                    value: c['des_cat_id'] as int,
-                    child: Text(c['des_cat_name'] as String),
-                  );
-                }).toList(),
-                onChanged: _onDesCatChanged,
-              ),
-              const SizedBox(height: 16),
-              _FieldLabel('Sub-Category (0 = any sub-cat)'),
-              DropdownButtonFormField<int>(
-                initialValue: _selDesSub,
-                decoration: _inputDeco(null),
-                items: [
-                  const DropdownMenuItem(value: 0, child: Text('All sub-categories')),
-                  ..._desSubs.map<DropdownMenuItem<int>>((s) {
-                    return DropdownMenuItem(
-                      value: s['des_sub_cat_id'] as int,
-                      child: Text('${s['emoji'] ?? ''} ${s['name'] ?? ''}'),
-                    );
-                  }),
-                ],
-                onChanged: (v) => setState(() => _selDesSub = v ?? 0),
-              ),
-              const SizedBox(height: 16),
-              _FieldLabel('Target User Categories (empty = all users)'),
-              Container(
-                constraints: const BoxConstraints(maxHeight: 160),
-                decoration: BoxDecoration(
-                    border: Border.all(color: _border),
-                    borderRadius: BorderRadius.circular(8)),
-                child: ListView(
-                  shrinkWrap: true,
-                  children: _userCats.map((c) {
-                    final id = c['cat_id'] as int;
-                    return CheckboxListTile(
-                      dense: true,
-                      value: _selUserCats.contains(id),
-                      title: Text(c['cat_name'] as String,
-                          style: const TextStyle(fontSize: 13)),
-                      activeColor: _blue,
-                      onChanged: (v) {
-                        setState(() {
-                          v == true
-                              ? _selUserCats.add(id)
-                              : _selUserCats.remove(id);
-                        });
-                      },
-                    );
-                  }).toList(),
+    final selCatNames = _userCats
+        .where((c) => _selUserCats.contains(c['cat_id'] as int))
+        .map((c) => c['cat_name'] as String)
+        .toList();
+
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: SizedBox(
+        width: 720,
+        height: 620,
+        child: Row(
+          children: [
+            // ── Left panel: rule config ──────────────────────────────────
+            Expanded(
+              flex: 5,
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header
+                    Row(children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: _blue.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(Icons.rule_rounded,
+                            color: _blue, size: 20),
+                      ),
+                      const SizedBox(width: 10),
+                      const Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('নতুন নোটিফিকেশন রুল',
+                              style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                  color: _textH)),
+                          Text('কখন কাকে নোটিফিকেশন যাবে',
+                              style: TextStyle(
+                                  fontSize: 11, color: _textM)),
+                        ],
+                      ),
+                    ]),
+                    const SizedBox(height: 20),
+                    const Divider(color: _border),
+                    const SizedBox(height: 16),
+
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Rule Name
+                            _FieldLabel('রুলের নাম'),
+                            TextField(
+                              controller: _nameCtrl,
+                              decoration: _inputDeco(
+                                  'e.g. বিক্রয় পোস্ট → সার্ভিস প্রোভাইডার'),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Post Category
+                            _FieldLabel('পোস্ট ক্যাটাগরি (des_cat)'),
+                            DropdownButtonFormField<int>(
+                              // ignore: deprecated_member_use
+                              value: _selDesCat,
+                              hint: const Text('ক্যাটাগরি বেছে নিন',
+                                  style: TextStyle(fontSize: 13)),
+                              decoration: _inputDeco(null),
+                              isExpanded: true,
+                              items: _desCats.map<DropdownMenuItem<int>>((c) {
+                                return DropdownMenuItem(
+                                  value: c['des_cat_id'] as int,
+                                  child: Text(c['des_cat_name'] as String,
+                                      style:
+                                          const TextStyle(fontSize: 13)),
+                                );
+                              }).toList(),
+                              onChanged: _onDesCatChanged,
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Sub-category — key forces rebuild when cat changes
+                            _FieldLabel('সাব-ক্যাটাগরি'),
+                            if (_subsLoading)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(vertical: 12),
+                                child: LinearProgressIndicator(color: _blue),
+                              )
+                            else
+                              DropdownButtonFormField<int>(
+                                key: ValueKey('sub_$_selDesCat'),
+                                // ignore: deprecated_member_use
+                                value: _selDesSub,
+                                decoration: _inputDeco(null),
+                                isExpanded: true,
+                                items: [
+                                  const DropdownMenuItem(
+                                    value: 0,
+                                    child: Text('🔁  সব সাব-ক্যাটাগরি',
+                                        style: TextStyle(fontSize: 13)),
+                                  ),
+                                  ..._desSubs
+                                      .map<DropdownMenuItem<int>>((s) {
+                                    return DropdownMenuItem(
+                                      value: s['des_sub_cat_id'] as int,
+                                      child: Text(
+                                        '${s['emoji'] ?? ''}  ${s['name'] ?? ''}',
+                                        style:
+                                            const TextStyle(fontSize: 13),
+                                      ),
+                                    );
+                                  }),
+                                ],
+                                onChanged: (v) =>
+                                    setState(() => _selDesSub = v ?? 0),
+                              ),
+                            const SizedBox(height: 20),
+
+                            // Preview summary
+                            if (_selDesCat != null)
+                              Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: _blue.withValues(alpha: 0.06),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(
+                                      color: _blue.withValues(alpha: 0.2)),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('রুল সারসংক্ষেপ',
+                                        style: TextStyle(
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w700,
+                                            color: _blue)),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      '"$_selDesCatName" → "$_selDesSubName" পোস্ট হলে '
+                                      '${_selUserCats.isEmpty ? "সব ইউজার" : "${_selUserCats.length}টি ক্যাটাগরি"}কে নোটিফাই করবে।',
+                                      style: const TextStyle(
+                                          fontSize: 12, color: _textH),
+                                    ),
+                                  ],
+                                ),
+                              ),
+
+                            if (_err != null) ...[
+                              const SizedBox(height: 10),
+                              Text(_err!,
+                                  style: const TextStyle(
+                                      color: _red, fontSize: 12)),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+                    Row(children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: _border),
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 14)),
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('বাতিল',
+                              style: TextStyle(color: _textM)),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: _blue,
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10)),
+                          ),
+                          onPressed: _saving ? null : _save,
+                          child: _saving
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white))
+                              : const Text('সেভ করুন',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w700)),
+                        ),
+                      ),
+                    ]),
+                  ],
                 ),
               ),
-              if (_err != null) ...[
-                const SizedBox(height: 10),
-                Text(_err!, style: const TextStyle(color: _red, fontSize: 12)),
-              ],
-            ],
-          ),
+            ),
+
+            // Divider
+            Container(width: 1, color: _border),
+
+            // ── Right panel: category selector ───────────────────────────
+            Expanded(
+              flex: 4,
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header row
+                    Row(children: [
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('টার্গেট ইউজার ক্যাটাগরি',
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: _textH)),
+                            Text('ফাঁকা রাখলে সবাই পাবে',
+                                style:
+                                    TextStyle(fontSize: 11, color: _textM)),
+                          ],
+                        ),
+                      ),
+                      if (_selUserCats.isNotEmpty)
+                        GestureDetector(
+                          onTap: () =>
+                              setState(() => _selUserCats.clear()),
+                          child: const Text('Clear all',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: _red,
+                                  fontWeight: FontWeight.w600)),
+                        ),
+                    ]),
+                    const SizedBox(height: 10),
+
+                    // Selected chips
+                    if (selCatNames.isNotEmpty) ...[
+                      SizedBox(
+                        height: 36,
+                        child: ListView.separated(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: selCatNames.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(width: 6),
+                          itemBuilder: (_, i) => Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: _blue,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(selCatNames[i],
+                                      style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w600)),
+                                  const SizedBox(width: 4),
+                                  GestureDetector(
+                                    onTap: () {
+                                      final id = _userCats.firstWhere(
+                                              (c) =>
+                                                  c['cat_name'] ==
+                                                  selCatNames[i])[
+                                          'cat_id'] as int;
+                                      setState(
+                                          () => _selUserCats.remove(id));
+                                    },
+                                    child: const Icon(Icons.close_rounded,
+                                        size: 12, color: Colors.white70),
+                                  ),
+                                ]),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+
+                    // Search box
+                    TextField(
+                      controller: _searchCtrl,
+                      decoration: InputDecoration(
+                        hintText: 'ক্যাটাগরি খুঁজুন...',
+                        hintStyle: const TextStyle(
+                            fontSize: 12, color: _textL),
+                        prefixIcon: const Icon(Icons.search_rounded,
+                            size: 16, color: _textL),
+                        suffixIcon: _searchCtrl.text.isNotEmpty
+                            ? IconButton(
+                                icon: const Icon(Icons.clear_rounded,
+                                    size: 14),
+                                onPressed: () {
+                                  _searchCtrl.clear();
+                                  _filterCats();
+                                })
+                            : null,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 8),
+                        border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide:
+                                const BorderSide(color: _border)),
+                        enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide:
+                                const BorderSide(color: _border)),
+                        focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: const BorderSide(
+                                color: _blue, width: 1.5)),
+                        filled: true,
+                        fillColor: _bg,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+
+                    // Count + select-all row
+                    Row(children: [
+                      Text(
+                        '${_filteredCats.length} ক্যাটাগরি',
+                        style: const TextStyle(
+                            fontSize: 11, color: _textL),
+                      ),
+                      const Spacer(),
+                      TextButton(
+                        style: TextButton.styleFrom(
+                            minimumSize: Size.zero,
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4)),
+                        onPressed: () => setState(() {
+                          for (final c in _filteredCats) {
+                            _selUserCats.add(c['cat_id'] as int);
+                          }
+                        }),
+                        child: const Text('সব সিলেক্ট',
+                            style: TextStyle(
+                                fontSize: 11, color: _blue)),
+                      ),
+                    ]),
+
+                    // List
+                    Expanded(
+                      child: _userCats.isEmpty
+                          ? const Center(
+                              child: CircularProgressIndicator(
+                                  color: _blue))
+                          : _filteredCats.isEmpty
+                              ? const Center(
+                                  child: Text('কিছু পাওয়া যায়নি',
+                                      style: TextStyle(
+                                          color: _textL,
+                                          fontSize: 12)))
+                              : ListView.builder(
+                                  itemCount: _filteredCats.length,
+                                  itemBuilder: (_, i) {
+                                    final c = _filteredCats[i];
+                                    final id = c['cat_id'] as int;
+                                    final selected =
+                                        _selUserCats.contains(id);
+                                    return InkWell(
+                                      onTap: () => setState(() => selected
+                                          ? _selUserCats.remove(id)
+                                          : _selUserCats.add(id)),
+                                      borderRadius:
+                                          BorderRadius.circular(8),
+                                      child: Container(
+                                        margin: const EdgeInsets.only(
+                                            bottom: 2),
+                                        padding:
+                                            const EdgeInsets.symmetric(
+                                                horizontal: 10,
+                                                vertical: 8),
+                                        decoration: BoxDecoration(
+                                          color: selected
+                                              ? _blue.withValues(alpha: 0.08)
+                                              : Colors.transparent,
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                          border: selected
+                                              ? Border.all(
+                                                  color: _blue
+                                                      .withValues(alpha: 0.3))
+                                              : null,
+                                        ),
+                                        child: Row(children: [
+                                          AnimatedContainer(
+                                            duration: const Duration(
+                                                milliseconds: 150),
+                                            width: 18,
+                                            height: 18,
+                                            decoration: BoxDecoration(
+                                              color: selected
+                                                  ? _blue
+                                                  : Colors.transparent,
+                                              border: Border.all(
+                                                  color: selected
+                                                      ? _blue
+                                                      : _border,
+                                                  width: 1.5),
+                                              borderRadius:
+                                                  BorderRadius.circular(
+                                                      5),
+                                            ),
+                                            child: selected
+                                                ? const Icon(
+                                                    Icons.check_rounded,
+                                                    size: 12,
+                                                    color: Colors.white)
+                                                : null,
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Text(
+                                              c['cat_name'] as String,
+                                              style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: selected
+                                                      ? _blue
+                                                      : _textH,
+                                                  fontWeight: selected
+                                                      ? FontWeight.w600
+                                                      : FontWeight.normal),
+                                            ),
+                                          ),
+                                        ]),
+                                      ),
+                                    );
+                                  },
+                                ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: _blue),
-          onPressed: _saving ? null : _save,
-          child: _saving
-              ? const SizedBox(
-                  width: 16, height: 16,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 2, color: Colors.white))
-              : const Text('Save Rule',
-                  style: TextStyle(color: Colors.white)),
-        ),
-      ],
     );
   }
 }
