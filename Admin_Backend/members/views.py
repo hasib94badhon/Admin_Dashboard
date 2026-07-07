@@ -1836,6 +1836,75 @@ def delete_des_sub_category(request, pk):
     return Response({"success": True, "message": "Deleted."})
 
 
+# ── Des Cat Suggestion CRUD (quick-suggestion words per sub-category) ────────
+
+def _suggestion_to_dict(s):
+    return {
+        "id":              s.id,
+        "des_sub_cat_id":  s.des_sub_cat_id,
+        "suggestion_text": s.suggestion_text,
+        "sort_order":      s.sort_order,
+    }
+
+
+@api_view(['GET'])
+def list_des_cat_suggestions(request):
+    """GET /api/des-cat-suggestions/?des_sub_cat_id=X — list suggestions for a sub-category."""
+    des_sub_cat_id = request.query_params.get('des_sub_cat_id')
+    if not des_sub_cat_id:
+        return Response({"error": "des_sub_cat_id is required."}, status=400)
+    qs = DesCatSuggestion.objects.filter(des_sub_cat_id=des_sub_cat_id)
+    return Response({"success": True, "suggestions": [_suggestion_to_dict(s) for s in qs]})
+
+
+@api_view(['POST'])
+def create_des_cat_suggestion(request):
+    """POST /api/des-cat-suggestions/create/"""
+    des_sub_cat_id  = request.data.get('des_sub_cat_id')
+    suggestion_text = (request.data.get('suggestion_text', '') or '').strip()
+    sort_order      = int(request.data.get('sort_order', 0) or 0)
+
+    if not des_sub_cat_id or not suggestion_text:
+        return Response({"error": "des_sub_cat_id and suggestion_text are required."}, status=400)
+    try:
+        sub = DesSubCat.objects.get(pk=des_sub_cat_id)
+    except DesSubCat.DoesNotExist:
+        return Response({"error": "Sub-category not found."}, status=404)
+
+    suggestion = DesCatSuggestion.objects.create(
+        des_sub_cat=sub,
+        suggestion_text=suggestion_text,
+        sort_order=sort_order,
+    )
+    return Response({"success": True, "suggestion": _suggestion_to_dict(suggestion)}, status=201)
+
+
+@api_view(['PUT'])
+def update_des_cat_suggestion(request, pk):
+    """PUT /api/des-cat-suggestions/<pk>/update/"""
+    try:
+        suggestion = DesCatSuggestion.objects.get(pk=pk)
+    except DesCatSuggestion.DoesNotExist:
+        return Response({"error": "Not found."}, status=404)
+
+    text = (request.data.get('suggestion_text', suggestion.suggestion_text) or '').strip()
+    suggestion.suggestion_text = text or suggestion.suggestion_text
+    suggestion.sort_order = int(request.data.get('sort_order', suggestion.sort_order) or suggestion.sort_order)
+    suggestion.save()
+    return Response({"success": True, "suggestion": _suggestion_to_dict(suggestion)})
+
+
+@api_view(['DELETE'])
+def delete_des_cat_suggestion(request, pk):
+    """DELETE /api/des-cat-suggestions/<pk>/delete/"""
+    try:
+        suggestion = DesCatSuggestion.objects.get(pk=pk)
+    except DesCatSuggestion.DoesNotExist:
+        return Response({"error": "Not found."}, status=404)
+    suggestion.delete()
+    return Response({"success": True, "message": "Deleted."})
+
+
 # ════════════════════════════════════════════════════════════════════════════
 # Notification System
 # ════════════════════════════════════════════════════════════════════════════

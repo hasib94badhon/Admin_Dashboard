@@ -44,6 +44,12 @@ urlpatterns = [
     path('api/des-sub-categories/<int:pk>/update/', update_des_sub_category, name='des-sub-categories-update'),
     path('api/des-sub-categories/<int:pk>/delete/', delete_des_sub_category, name='des-sub-categories-delete'),
 
+    # Suggestion CRUD (quick-suggestion words per sub-category)
+    path('api/des-cat-suggestions/', list_des_cat_suggestions, name='des-cat-suggestions-list'),
+    path('api/des-cat-suggestions/create/', create_des_cat_suggestion, name='des-cat-suggestions-create'),
+    path('api/des-cat-suggestions/<int:pk>/update/', update_des_cat_suggestion, name='des-cat-suggestions-update'),
+    path('api/des-cat-suggestions/<int:pk>/delete/', delete_des_cat_suggestion, name='des-cat-suggestions-delete'),
+
     # ── Notification System ─────────────────────────────────────────────────
     path('api/notification-rules/',                list_notification_rules,       name='notif-rules-list'),
     path('api/notification-rules/create/',         create_notification_rule,      name='notif-rules-create'),

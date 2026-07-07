@@ -217,6 +217,20 @@ class DesSubCat(models.Model):
         ordering = ['des_cat_id', 'sort_order']
 
 
+class DesCatSuggestion(models.Model):
+    id              = models.AutoField(primary_key=True)
+    des_sub_cat     = models.ForeignKey(DesSubCat, on_delete=models.CASCADE,
+                                        db_column='des_sub_cat_id', related_name='suggestions')
+    suggestion_text = models.CharField(max_length=255)
+    sort_order      = models.IntegerField(default=0)
+    created_at      = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        managed = False
+        db_table = 'des_cat_suggestion'
+        ordering = ['des_sub_cat_id', 'sort_order']
+
+
 class Description(models.Model):
     des_id = models.AutoField(primary_key=True)
     user_id = models.IntegerField()
