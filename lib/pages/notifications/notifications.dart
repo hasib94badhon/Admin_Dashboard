@@ -134,16 +134,36 @@ class _RulesTabState extends State<_RulesTab> {
 
   Future<void> _toggle(Map rule) async {
     final newVal = !(rule['is_active'] as bool);
-    await NotificationAdminService.toggleRule(rule['rule_id'] as int, newVal);
-    _load();
+    try {
+      await NotificationAdminService.toggleRule(rule['rule_id'] as int, newVal);
+      _load();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to update rule: $e')));
+      }
+    }
   }
 
   Future<void> _delete(Map rule) async {
     final confirmed = await _confirm(
         context, 'Delete rule "${rule['rule_name']}"?');
     if (!confirmed) return;
-    await NotificationAdminService.deleteRule(rule['rule_id'] as int);
-    _load();
+    try {
+      final ok = await NotificationAdminService.deleteRule(rule['rule_id'] as int);
+      if (!mounted) return;
+      if (ok) {
+        _load();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Failed to delete rule')));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to delete rule: $e')));
+      }
+    }
   }
 
   @override
@@ -1591,17 +1611,17 @@ InputDecoration _inputDeco(String? hint) {
 Future<bool> _confirm(BuildContext context, String message) async {
   final result = await showDialog<bool>(
     context: context,
-    builder: (_) => AlertDialog(
+    builder: (dialogCtx) => AlertDialog(
       title: const Text('Confirm', style: TextStyle(fontSize: 15)),
       content: Text(message, style: const TextStyle(fontSize: 13)),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       actions: [
         TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
             child: const Text('Cancel')),
         ElevatedButton(
           style: ElevatedButton.styleFrom(backgroundColor: _blue),
-          onPressed: () => Navigator.of(context).pop(true),
+          onPressed: () => Navigator.of(dialogCtx).pop(true),
           child:
               const Text('Confirm', style: TextStyle(color: Colors.white)),
         ),
