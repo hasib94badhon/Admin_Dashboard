@@ -433,6 +433,8 @@ class Subscribers(models.Model):
     reg_id = models.IntegerField()
     cat_id = models.IntegerField()
     type = models.CharField(max_length=255)
+    requested_at = models.DateTimeField(blank=True, null=True)
+    last_notified_at = models.DateTimeField(blank=True, null=True)
     last_pay = models.DateTimeField(blank=True, null=True)
     payment_history = models.TextField(blank=True, null=True)
 
@@ -562,7 +564,7 @@ class BroadcastNotification(models.Model):
 
 class NotificationSendLog(models.Model):
     TRIGGER_CHOICES = [('post', 'Post'), ('broadcast', 'Broadcast'),
-                       ('new_user', 'New User')]
+                       ('new_user', 'New User'), ('subscription', 'Subscription')]
     STATUS_CHOICES  = [('sent', 'Sent'), ('failed', 'Failed'),
                        ('no_token', 'No Token')]
     log_id        = models.AutoField(primary_key=True)

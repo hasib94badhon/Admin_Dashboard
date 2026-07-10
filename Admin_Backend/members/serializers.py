@@ -140,6 +140,10 @@ class ShopUserSerializer(serializers.ModelSerializer):
 
 
 
+MONTHLY_CALL_THRESHOLD = 10
+MONTHLY_VIEW_THRESHOLD = 20
+
+
 class SubscriberSerializer(serializers.ModelSerializer):
     user_name = serializers.SerializerMethodField()
     phone = serializers.SerializerMethodField()
@@ -148,12 +152,18 @@ class SubscriberSerializer(serializers.ModelSerializer):
     shop_id = serializers.SerializerMethodField()
     location_address = serializers.SerializerMethodField()
     last_pay = serializers.SerializerMethodField()
+    user_status = serializers.SerializerMethodField()
+    monthly_calls = serializers.SerializerMethodField()
+    monthly_views = serializers.SerializerMethodField()
+    eligible_for_notification = serializers.SerializerMethodField()
 
     class Meta:
         model = Subscribers
         fields = [
             "sub_id", "user_id", "user_name", "phone", "category",
-            "service_id", "shop_id", "type", "last_pay", "payment_history","location_address"
+            "service_id", "shop_id", "type", "requested_at", "last_notified_at",
+            "last_pay", "payment_history", "location_address", "user_status",
+            "monthly_calls", "monthly_views", "eligible_for_notification",
         ]
 
     def get_user_name(self, obj):
@@ -179,8 +189,37 @@ class SubscriberSerializer(serializers.ModelSerializer):
     def get_location_address(self, obj):
         loc = Location.objects.filter(user_id=obj.user_id).first()
         return loc.address if loc else 'N/A'
+
     def get_last_pay(self, obj):
         return obj.last_pay if obj.last_pay else 'N/A'
+
+    def get_user_status(self, obj):
+        user = Users.objects.filter(user_id=obj.user_id).first()
+        return bool(user.status and user.is_active) if user else False
+
+    def _month_start(self):
+        n = timezone.localtime(timezone.now())
+        return n.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+    def get_monthly_calls(self, obj):
+        return CallList.objects.filter(
+            user_id=obj.user_id, call_time__gte=self._month_start()
+        ).count()
+
+    def get_monthly_views(self, obj):
+        return ViewList.objects.filter(
+            user_id=obj.user_id, view_time__gte=self._month_start()
+        ).count()
+
+    def get_eligible_for_notification(self, obj):
+        calls = self.get_monthly_calls(obj)
+        views = self.get_monthly_views(obj)
+        crosses_threshold = calls >= MONTHLY_CALL_THRESHOLD or views >= MONTHLY_VIEW_THRESHOLD
+        if not crosses_threshold:
+            return False
+        if obj.last_notified_at and obj.last_notified_at >= self._month_start():
+            return False
+        return True
 
 
 # Add new subscribers

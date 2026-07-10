@@ -1327,6 +1327,25 @@ class SubscriberListView(APIView):
     def get(self, request):
         queryset = Subscribers.objects.all()
 
+        # 🔎 Panel view (requesting / eligible to pay / eligible for notification)
+        view = request.GET.get('view', 'all')
+        if view == 'requesting':
+            queryset = queryset.filter(type__iexact='waiting')
+        elif view == 'eligible_pay':
+            queryset = queryset.filter(type__iexact='unpaid')
+        elif view == 'eligible_notify':
+            month_start = timezone.localtime(timezone.now()).replace(
+                day=1, hour=0, minute=0, second=0, microsecond=0)
+            call_counts = (CallList.objects.filter(call_time__gte=month_start)
+                           .values('user_id').annotate(cnt=Count('call_id')))
+            view_counts = (ViewList.objects.filter(view_time__gte=month_start)
+                           .values('user_id').annotate(cnt=Count('view_id')))
+            caller_ids = {r['user_id'] for r in call_counts if r['cnt'] >= MONTHLY_CALL_THRESHOLD}
+            viewer_ids = {r['user_id'] for r in view_counts if r['cnt'] >= MONTHLY_VIEW_THRESHOLD}
+            queryset = queryset.filter(user_id__in=(caller_ids | viewer_ids)).filter(
+                Q(last_notified_at__isnull=True) | Q(last_notified_at__lt=month_start)
+            )
+
         # 🔎 Search
         search = request.GET.get('search')
         if search:
@@ -1383,6 +1402,23 @@ class SubscriberListView(APIView):
 
         total_categories = queryset.values("cat_id").distinct().count()
 
+        # 🔎 Panel-wide badge counts (independent of the current view/search filters)
+        month_start = timezone.localtime(timezone.now()).replace(
+            day=1, hour=0, minute=0, second=0, microsecond=0)
+        requesting_count = Subscribers.objects.filter(type__iexact='waiting').count()
+        eligible_pay_count = Subscribers.objects.filter(type__iexact='unpaid').count()
+        call_counts_all = (CallList.objects.filter(call_time__gte=month_start)
+                           .values('user_id').annotate(cnt=Count('call_id')))
+        view_counts_all = (ViewList.objects.filter(view_time__gte=month_start)
+                           .values('user_id').annotate(cnt=Count('view_id')))
+        caller_ids_all = {r['user_id'] for r in call_counts_all if r['cnt'] >= MONTHLY_CALL_THRESHOLD}
+        viewer_ids_all = {r['user_id'] for r in view_counts_all if r['cnt'] >= MONTHLY_VIEW_THRESHOLD}
+        eligible_notify_count = Subscribers.objects.filter(
+            user_id__in=(caller_ids_all | viewer_ids_all)
+        ).filter(
+            Q(last_notified_at__isnull=True) | Q(last_notified_at__lt=month_start)
+        ).count()
+
         summary = {
             "total_subscribers": total_subscribers,
             "service_paid": service_paid,
@@ -1390,6 +1426,9 @@ class SubscriberListView(APIView):
             "shop_paid": shop_paid,
             "shop_unpaid": shop_unpaid,
             "total_categories": total_categories,
+            "requesting_count": requesting_count,
+            "eligible_pay_count": eligible_pay_count,
+            "eligible_notify_count": eligible_notify_count,
         }
 
         # 🔎 Pagination
@@ -1626,6 +1665,72 @@ def toggle_subscriber(request, sub_id):
 
     except Subscribers.DoesNotExist:
         return JsonResponse({"error": "Subscriber not found"}, status=404)
+
+
+@csrf_exempt
+def approve_subscriber(request, sub_id):
+    """The 'Approve & Mark Paid' gateway — unlike toggle_subscriber (which
+    flips anything-not-unpaid back to unpaid), this only ever moves a row
+    forward to 'paid', whether it started as 'waiting' or 'unpaid'."""
+    if request.method != "POST":
+        return JsonResponse({"error": "Only POST allowed"}, status=405)
+
+    try:
+        subscriber = Subscribers.objects.get(sub_id=sub_id)
+
+        bd_tz = pytz.timezone("Asia/Dhaka")
+        bd_time = timezone.now().astimezone(bd_tz)
+
+        subscriber.type = "paid"
+        subscriber.last_pay = bd_time
+        subscriber.requested_at = None
+
+        bd_time_str = bd_time.strftime("%Y-%m-%d %H:%M:%S")
+        if subscriber.payment_history:
+            subscriber.payment_history = f"{bd_time_str}, {subscriber.payment_history}"
+        else:
+            subscriber.payment_history = bd_time_str
+
+        subscriber.save()
+
+        return JsonResponse({
+            "sub_id": subscriber.sub_id,
+            "type": subscriber.type,
+            "last_pay": subscriber.last_pay.strftime("%Y-%m-%d %H:%M:%S") if subscriber.last_pay else None,
+            "payment_history": subscriber.payment_history,
+        }, status=200)
+
+    except Subscribers.DoesNotExist:
+        return JsonResponse({"error": "Subscriber not found"}, status=404)
+
+
+@api_view(['POST'])
+def notify_subscriber_usage(request, sub_id):
+    """Proxies to the Flask backend's FCM push, mirroring send_broadcast_view."""
+    try:
+        subscriber = Subscribers.objects.get(sub_id=sub_id)
+    except Subscribers.DoesNotExist:
+        return Response({'success': False, 'message': 'Subscriber not found'}, status=404)
+
+    month_start = timezone.localtime(timezone.now()).replace(
+        day=1, hour=0, minute=0, second=0, microsecond=0)
+    monthly_calls = CallList.objects.filter(
+        user_id=subscriber.user_id, call_time__gte=month_start).count()
+    monthly_views = ViewList.objects.filter(
+        user_id=subscriber.user_id, view_time__gte=month_start).count()
+
+    try:
+        result = _call_flask_admin(
+            f'/admin/subscribers/{subscriber.user_id}/notify-usage',
+            {'monthly_calls': monthly_calls, 'monthly_views': monthly_views},
+        )
+        return Response({'success': True, **result})
+    except _urllib_err.HTTPError as e:
+        err_body = e.read().decode()
+        return Response({'success': False,
+                         'message': f'Flask error {e.code}: {err_body}'}, status=502)
+    except Exception as e:
+        return Response({'success': False, 'message': str(e)}, status=502)
 
 
 @api_view(['GET'])
