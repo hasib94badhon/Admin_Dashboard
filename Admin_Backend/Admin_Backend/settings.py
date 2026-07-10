@@ -119,6 +119,11 @@ DATABASES = {
         'PASSWORD': config('DB_PASSWORD'),
         'HOST': config('DB_HOST', default='127.0.0.1'),
         'PORT': config('DB_PORT', default='3306'),
+        # Without this, mysqlclient's connection charset defaults to
+        # something that can't carry 4-byte UTF-8 (emoji), even though the
+        # table/column themselves are utf8mb4 — MySQL silently replaces
+        # them with '?' on the way out instead of erroring.
+        'OPTIONS': {'charset': 'utf8mb4'},
     }
 }
 
