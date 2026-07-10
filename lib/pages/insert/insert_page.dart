@@ -737,13 +737,13 @@ class _SubCatManagerState extends State<_SubCatManager> {
   Future<void> _delete(int id) async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogCtx) => AlertDialog(
         title: const Text('Delete Sub-Category'),
         content: const Text('Are you sure you want to delete this sub-category?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(dialogCtx, false), child: const Text('Cancel')),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(dialogCtx, true),
             child: const Text('Delete', style: TextStyle(color: errorColor)),
           ),
         ],
@@ -1702,13 +1702,13 @@ class _FbSingleManagerState extends State<_FbSingleManager> {
   Future<void> _delete(int pageId) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogCtx) => AlertDialog(
         title: const Text('Delete Page'),
         content: const Text('Remove this Facebook page?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(dialogCtx, false), child: const Text('Cancel')),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(dialogCtx, true),
             child: const Text('Delete', style: TextStyle(color: errorColor)),
           ),
         ],
@@ -1990,13 +1990,13 @@ class _YtChannelManagerState extends State<_YtChannelManager>
   Future<void> _delete(int channelId) async {
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogCtx) => AlertDialog(
         title: const Text('Delete Channel'),
         content: const Text('Remove this YouTube channel?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(dialogCtx, false), child: const Text('Cancel')),
           TextButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(dialogCtx, true),
             child: const Text('Delete', style: TextStyle(color: errorColor)),
           ),
         ],
