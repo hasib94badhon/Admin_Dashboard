@@ -35,6 +35,7 @@ urlpatterns = [
     path('api/contact-info/', ContactInfoAPIView.as_view(), name='contact-info'),
     path('api/toggle-subscriber/<int:sub_id>/', toggle_subscriber, name='toggle-subscriber'),
     path('api/approve-subscriber/<int:sub_id>/', approve_subscriber, name='approve-subscriber'),
+    path('api/reject-subscriber/<int:sub_id>/', reject_subscriber, name='reject-subscriber'),
     path('api/subscriber/<int:sub_id>/notify-usage/', notify_subscriber_usage, name='notify-subscriber-usage'),
     path('api/overview-stats/', overview_stats, name='overview-stats'),
     path('api/app-status/', app_status, name='app-status'),

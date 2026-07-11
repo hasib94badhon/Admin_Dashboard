@@ -437,6 +437,7 @@ class Subscribers(models.Model):
     last_notified_at = models.DateTimeField(blank=True, null=True)
     last_pay = models.DateTimeField(blank=True, null=True)
     payment_history = models.TextField(blank=True, null=True)
+    reject_reason = models.TextField(blank=True, null=True)
 
     class Meta:
         managed = False

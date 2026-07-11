@@ -163,8 +163,9 @@ class SubscriberSerializer(serializers.ModelSerializer):
         fields = [
             "sub_id", "user_id", "user_name", "phone", "category",
             "service_id", "shop_id", "type", "requested_at", "last_notified_at",
-            "last_pay", "payment_history", "location_address", "user_status",
-            "monthly_calls", "monthly_views", "eligible_for_notification",
+            "last_pay", "payment_history", "reject_reason", "location_address",
+            "user_status", "monthly_calls", "monthly_views",
+            "eligible_for_notification",
         ]
 
     def get_user_name(self, obj):

@@ -1513,36 +1513,29 @@ class CreateSubscribersView(APIView):
         users = Users.objects.exclude(user_id__in=existing_ids)
 
         for user in users:
+            # Same eligibility formula as Flask's self-check
+            # (/check_and_subscribe_user): usage_days since registration > 90
+            # OR user_called > 50. Previously this bulk scan used
+            # service/shop LISTING age instead of registration age, which
+            # could disagree with the mobile app's own eligibility check for
+            # the same user -- now there's exactly one definition.
             eligible = False
-            source_type = None
 
-            # শর্ত ১: called > 50
             if user.user_called and user.user_called > 50:
                 eligible = True
 
-            # শর্ত ২: Service/Shop date_time > 90 days
+            if not eligible:
+                reg = Reg.objects.filter(reg_id=user.reg_id).first()
+                if reg and reg.created_date:
+                    created_dt = normalize_datetime(reg.created_date)
+                    if created_dt and created_dt < ninety_days_ago:
+                        eligible = True
+
+            # Service/shop presence is purely informational for the summary
+            # counts below -- it no longer gates eligibility.
             service = Service.objects.filter(user_id=user.user_id).first()
             shop = Shop.objects.filter(user_id=user.user_id).first()
-
-            # if service and service.date_time < ninety_days_ago:
-            #     eligible = True
-            #     source_type = "service"
-            # if shop and shop.date_time < ninety_days_ago:
-            #     eligible = True
-            #     source_type = "shop"
-
-            if service and service.date_time:
-                service_dt = normalize_datetime(service.date_time)
-                if service_dt and service_dt < ninety_days_ago:
-                    eligible = True
-                    source_type = "service"
-
-            if shop and shop.date_time:
-                shop_dt = normalize_datetime(shop.date_time)
-                if shop_dt and shop_dt < ninety_days_ago:
-                    eligible = True
-                    source_type = "shop"
-
+            source_type = "service" if service else ("shop" if shop else None)
 
             if eligible:
                 subscriber = Subscribers.objects.create(
@@ -1681,83 +1674,79 @@ def overview_stats(request):
 
 @csrf_exempt
 def toggle_subscriber(request, sub_id):
+    """Thin proxy to Flask's /admin/subscribers/<user_id>/toggle -- Flask
+    owns the actual subscribers-table write now (and FCM), matching the
+    admin_delete_user/notify_subscriber_usage pattern below."""
     if request.method != "POST":
         return JsonResponse({"error": "Only POST allowed"}, status=405)
 
     try:
         subscriber = Subscribers.objects.get(sub_id=sub_id)
-
-        if subscriber.type.lower() == "unpaid":
-            # Toggle to paid
-            subscriber.type = "paid"
-
-            # একবারই BD time নাও
-            bd_tz = pytz.timezone("Asia/Dhaka")
-            bd_time = timezone.now().astimezone(bd_tz)
-
-            # last_pay এ datetime save করো
-            subscriber.last_pay = bd_time
-
-            # একই bd_time কে string করে payment_history তে prepend করো
-            bd_time_str = bd_time.strftime("%Y-%m-%d %H:%M:%S")
-            if subscriber.payment_history:
-                subscriber.payment_history = f"{bd_time_str}, {subscriber.payment_history}"
-            else:
-                subscriber.payment_history = bd_time_str
-
-        else:
-            # Toggle to unpaid
-            subscriber.type = "unpaid"
-            subscriber.last_pay = None
-
-        subscriber.save()
-
-        return JsonResponse({
-            "sub_id": subscriber.sub_id,
-            "type": subscriber.type,
-            "last_pay": subscriber.last_pay.strftime("%Y-%m-%d %H:%M:%S") if subscriber.last_pay else None,
-            "payment_history": subscriber.payment_history
-        }, status=200)
-
     except Subscribers.DoesNotExist:
         return JsonResponse({"error": "Subscriber not found"}, status=404)
+
+    try:
+        result = _call_flask_admin(f'/admin/subscribers/{subscriber.user_id}/toggle', {})
+        return JsonResponse({"sub_id": subscriber.sub_id, **result}, status=200)
+    except _urllib_err.HTTPError as e:
+        return JsonResponse({"error": f"Flask error {e.code}: {e.read().decode()}"}, status=502)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=502)
 
 
 @csrf_exempt
 def approve_subscriber(request, sub_id):
     """The 'Approve & Mark Paid' gateway — unlike toggle_subscriber (which
     flips anything-not-unpaid back to unpaid), this only ever moves a row
-    forward to 'paid', whether it started as 'waiting' or 'unpaid'."""
+    forward to 'paid', whether it started as 'waiting' or 'unpaid'. Thin
+    proxy to Flask's /admin/subscribers/<user_id>/approve, which does the
+    write and sends the user a push notification."""
     if request.method != "POST":
         return JsonResponse({"error": "Only POST allowed"}, status=405)
 
     try:
         subscriber = Subscribers.objects.get(sub_id=sub_id)
-
-        bd_tz = pytz.timezone("Asia/Dhaka")
-        bd_time = timezone.now().astimezone(bd_tz)
-
-        subscriber.type = "paid"
-        subscriber.last_pay = bd_time
-        subscriber.requested_at = None
-
-        bd_time_str = bd_time.strftime("%Y-%m-%d %H:%M:%S")
-        if subscriber.payment_history:
-            subscriber.payment_history = f"{bd_time_str}, {subscriber.payment_history}"
-        else:
-            subscriber.payment_history = bd_time_str
-
-        subscriber.save()
-
-        return JsonResponse({
-            "sub_id": subscriber.sub_id,
-            "type": subscriber.type,
-            "last_pay": subscriber.last_pay.strftime("%Y-%m-%d %H:%M:%S") if subscriber.last_pay else None,
-            "payment_history": subscriber.payment_history,
-        }, status=200)
-
     except Subscribers.DoesNotExist:
         return JsonResponse({"error": "Subscriber not found"}, status=404)
+
+    try:
+        result = _call_flask_admin(f'/admin/subscribers/{subscriber.user_id}/approve', {})
+        return JsonResponse({"sub_id": subscriber.sub_id, **result}, status=200)
+    except _urllib_err.HTTPError as e:
+        return JsonResponse({"error": f"Flask error {e.code}: {e.read().decode()}"}, status=502)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=502)
+
+
+@csrf_exempt
+def reject_subscriber(request, sub_id):
+    """Rejects a waiting/unpaid request back to 'unpaid' with an admin-
+    supplied reason, proxied to Flask which persists reject_reason and
+    sends the user a push notification quoting it."""
+    if request.method != "POST":
+        return JsonResponse({"error": "Only POST allowed"}, status=405)
+
+    try:
+        subscriber = Subscribers.objects.get(sub_id=sub_id)
+    except Subscribers.DoesNotExist:
+        return JsonResponse({"error": "Subscriber not found"}, status=404)
+
+    reason = (request.POST.get('reason') or '').strip()
+    if not reason:
+        try:
+            reason = (_json.loads(request.body or b'{}').get('reason') or '').strip()
+        except Exception:
+            reason = ''
+    if not reason:
+        return JsonResponse({"error": "reason is required"}, status=400)
+
+    try:
+        result = _call_flask_admin(f'/admin/subscribers/{subscriber.user_id}/reject', {'reason': reason})
+        return JsonResponse({"sub_id": subscriber.sub_id, **result}, status=200)
+    except _urllib_err.HTTPError as e:
+        return JsonResponse({"error": f"Flask error {e.code}: {e.read().decode()}"}, status=502)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=502)
 
 
 @api_view(['POST'])
