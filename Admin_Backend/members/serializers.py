@@ -74,7 +74,6 @@ class ServiceUserSerializer(serializers.ModelSerializer):
     phone = serializers.CharField(source='user_id.phone', read_only=True)
     photo = serializers.CharField(source='user_id.photo', read_only=True)
     subscriber_type = serializers.SerializerMethodField()
-    last_pay = serializers.SerializerMethodField()
     location_address = serializers.SerializerMethodField()
     location_updated_at = serializers.SerializerMethodField()
 
@@ -83,17 +82,13 @@ class ServiceUserSerializer(serializers.ModelSerializer):
         fields = [
             'user_id', 'service_id', 'name', 'date_time',
             'user_name', 'cat_name', 'phone', 'photo',
-            'subscriber_type', 'last_pay',
+            'subscriber_type',
             'location_address', 'location_updated_at'
         ]
 
     def get_subscriber_type(self, obj):
         sub = Subscribers.objects.filter(user_id=obj.user_id.user_id).first()
         return sub.type if sub else "N/A"
-
-    def get_last_pay(self, obj):
-        sub = Subscribers.objects.filter(user_id=obj.user_id.user_id).first()
-        return sub.last_pay if sub and sub.last_pay else "N/A"
 
     def get_location_address(self, obj):
         loc = Location.objects.filter(user_id=obj.user_id.user_id).first()
@@ -110,7 +105,6 @@ class ShopUserSerializer(serializers.ModelSerializer):
     phone = serializers.CharField(source='user_id.phone', read_only=True)
     photo = serializers.CharField(source='user_id.photo', read_only=True)
     subscriber_type = serializers.SerializerMethodField()
-    last_pay = serializers.SerializerMethodField()
     location_address = serializers.SerializerMethodField()
     location_updated_at = serializers.SerializerMethodField()
 
@@ -119,17 +113,13 @@ class ShopUserSerializer(serializers.ModelSerializer):
         fields = [
             'user_id', 'shop_id', 'name', 'date_time',
             'user_name', 'cat_name', 'phone', 'photo',
-            'subscriber_type', 'last_pay',
+            'subscriber_type',
             'location_address', 'location_updated_at'
         ]
 
     def get_subscriber_type(self, obj):
         sub = Subscribers.objects.filter(user_id=obj.user_id.user_id).first()
         return sub.type if sub else "N/A"
-
-    def get_last_pay(self, obj):
-        sub = Subscribers.objects.filter(user_id=obj.user_id.user_id).first()
-        return sub.last_pay if sub and sub.last_pay else "N/A"
 
     def get_location_address(self, obj):
         loc = Location.objects.filter(user_id=obj.user_id.user_id).first()
@@ -141,10 +131,6 @@ class ShopUserSerializer(serializers.ModelSerializer):
 
 
 
-MONTHLY_CALL_THRESHOLD = 10
-MONTHLY_VIEW_THRESHOLD = 20
-
-
 class SubscriberSerializer(serializers.ModelSerializer):
     user_name = serializers.SerializerMethodField()
     phone = serializers.SerializerMethodField()
@@ -152,20 +138,16 @@ class SubscriberSerializer(serializers.ModelSerializer):
     service_id = serializers.SerializerMethodField()
     shop_id = serializers.SerializerMethodField()
     location_address = serializers.SerializerMethodField()
-    last_pay = serializers.SerializerMethodField()
     user_status = serializers.SerializerMethodField()
-    monthly_calls = serializers.SerializerMethodField()
-    monthly_views = serializers.SerializerMethodField()
-    eligible_for_notification = serializers.SerializerMethodField()
+    user_called = serializers.SerializerMethodField()
+    user_viewed = serializers.SerializerMethodField()
 
     class Meta:
         model = Subscribers
         fields = [
             "sub_id", "user_id", "user_name", "phone", "category",
-            "service_id", "shop_id", "type", "requested_at", "last_notified_at",
-            "last_pay", "payment_history", "reject_reason", "location_address",
-            "user_status", "monthly_calls", "monthly_views",
-            "eligible_for_notification",
+            "service_id", "shop_id", "type", "last_notified_at",
+            "location_address", "user_status", "user_called", "user_viewed",
         ]
 
     def get_user_name(self, obj):
@@ -192,40 +174,14 @@ class SubscriberSerializer(serializers.ModelSerializer):
         loc = Location.objects.filter(user_id=obj.user_id).first()
         return loc.address if loc else 'N/A'
 
-    def get_last_pay(self, obj):
-        return obj.last_pay if obj.last_pay else 'N/A'
-
     def get_user_status(self, obj):
         user = Users.objects.filter(user_id=obj.user_id).first()
         return bool(user.status and user.is_active) if user else False
 
-    def _month_start(self):
-        n = timezone.localtime(timezone.now())
-        return n.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    def get_user_called(self, obj):
+        user = Users.objects.filter(user_id=obj.user_id).first()
+        return user.user_called if user else 0
 
-    def get_monthly_calls(self, obj):
-        return CallList.objects.filter(
-            user_id=obj.user_id, call_time__gte=self._month_start()
-        ).count()
-
-    def get_monthly_views(self, obj):
-        return ViewList.objects.filter(
-            user_id=obj.user_id, view_time__gte=self._month_start()
-        ).count()
-
-    def get_eligible_for_notification(self, obj):
-        calls = self.get_monthly_calls(obj)
-        views = self.get_monthly_views(obj)
-        crosses_threshold = calls >= MONTHLY_CALL_THRESHOLD or views >= MONTHLY_VIEW_THRESHOLD
-        if not crosses_threshold:
-            return False
-        if obj.last_notified_at and obj.last_notified_at >= self._month_start():
-            return False
-        return True
-
-
-# Add new subscribers
-class SubscriberSerializerPost(serializers.ModelSerializer):
-    class Meta:
-        model = Subscribers
-        fields = "__all__"
+    def get_user_viewed(self, obj):
+        user = Users.objects.filter(user_id=obj.user_id).first()
+        return user.user_viewed if user else 0

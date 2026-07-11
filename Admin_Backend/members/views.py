@@ -1383,24 +1383,10 @@ class SubscriberListView(APIView):
     def get(self, request):
         queryset = Subscribers.objects.all()
 
-        # 🔎 Panel view (requesting / eligible to pay / eligible for notification)
+        # 🔎 Panel view -- type is just unpaid/paid now, no waiting state
         view = request.GET.get('view', 'all')
-        if view == 'requesting':
-            queryset = queryset.filter(type__iexact='waiting')
-        elif view == 'eligible_pay':
-            queryset = queryset.filter(type__iexact='unpaid')
-        elif view == 'eligible_notify':
-            month_start = timezone.localtime(timezone.now()).replace(
-                day=1, hour=0, minute=0, second=0, microsecond=0)
-            call_counts = (CallList.objects.filter(call_time__gte=month_start)
-                           .values('user_id').annotate(cnt=Count('call_id')))
-            view_counts = (ViewList.objects.filter(view_time__gte=month_start)
-                           .values('user_id').annotate(cnt=Count('view_id')))
-            caller_ids = {r['user_id'] for r in call_counts if r['cnt'] >= MONTHLY_CALL_THRESHOLD}
-            viewer_ids = {r['user_id'] for r in view_counts if r['cnt'] >= MONTHLY_VIEW_THRESHOLD}
-            queryset = queryset.filter(user_id__in=(caller_ids | viewer_ids)).filter(
-                Q(last_notified_at__isnull=True) | Q(last_notified_at__lt=month_start)
-            )
+        if view in ('unpaid', 'paid'):
+            queryset = queryset.filter(type__iexact=view)
 
         # 🔎 Search
         search = request.GET.get('search')
@@ -1424,7 +1410,7 @@ class SubscriberListView(APIView):
         # 🔎 Sort
         sort_by = request.GET.get('sort')
         if sort_by == "recent":
-            queryset = queryset.order_by("-last_pay")
+            queryset = queryset.order_by("-sub_id")
         elif sort_by == "type":
             queryset = queryset.order_by("type")
         elif sort_by == "cat":
@@ -1459,21 +1445,8 @@ class SubscriberListView(APIView):
         total_categories = queryset.values("cat_id").distinct().count()
 
         # 🔎 Panel-wide badge counts (independent of the current view/search filters)
-        month_start = timezone.localtime(timezone.now()).replace(
-            day=1, hour=0, minute=0, second=0, microsecond=0)
-        requesting_count = Subscribers.objects.filter(type__iexact='waiting').count()
-        eligible_pay_count = Subscribers.objects.filter(type__iexact='unpaid').count()
-        call_counts_all = (CallList.objects.filter(call_time__gte=month_start)
-                           .values('user_id').annotate(cnt=Count('call_id')))
-        view_counts_all = (ViewList.objects.filter(view_time__gte=month_start)
-                           .values('user_id').annotate(cnt=Count('view_id')))
-        caller_ids_all = {r['user_id'] for r in call_counts_all if r['cnt'] >= MONTHLY_CALL_THRESHOLD}
-        viewer_ids_all = {r['user_id'] for r in view_counts_all if r['cnt'] >= MONTHLY_VIEW_THRESHOLD}
-        eligible_notify_count = Subscribers.objects.filter(
-            user_id__in=(caller_ids_all | viewer_ids_all)
-        ).filter(
-            Q(last_notified_at__isnull=True) | Q(last_notified_at__lt=month_start)
-        ).count()
+        unpaid_count = Subscribers.objects.filter(type__iexact='unpaid').count()
+        paid_count = Subscribers.objects.filter(type__iexact='paid').count()
 
         summary = {
             "total_subscribers": total_subscribers,
@@ -1482,9 +1455,8 @@ class SubscriberListView(APIView):
             "shop_paid": shop_paid,
             "shop_unpaid": shop_unpaid,
             "total_categories": total_categories,
-            "requesting_count": requesting_count,
-            "eligible_pay_count": eligible_pay_count,
-            "eligible_notify_count": eligible_notify_count,
+            "unpaid_count": unpaid_count,
+            "paid_count": paid_count,
         }
 
         # 🔎 Pagination
@@ -1497,75 +1469,6 @@ class SubscriberListView(APIView):
             "results": serializer.data
         })
     
-
-
-class CreateSubscribersView(APIView):
-    def post(self, request):
-        today = timezone.now()
-        ninety_days_ago = timezone.make_naive(today - timedelta(days=90), timezone.get_current_timezone())
-
-        created_subscribers = []
-        service_count = 0
-        shop_count = 0
-
-        # 🔎 Subscribers এ যাদের আছে তাদের বাদ দাও
-        existing_ids = Subscribers.objects.values_list("user_id", flat=True)
-        users = Users.objects.exclude(user_id__in=existing_ids)
-
-        for user in users:
-            # Same eligibility formula as Flask's self-check
-            # (/check_and_subscribe_user): usage_days since registration > 90
-            # OR user_called > 50. Previously this bulk scan used
-            # service/shop LISTING age instead of registration age, which
-            # could disagree with the mobile app's own eligibility check for
-            # the same user -- now there's exactly one definition.
-            eligible = False
-
-            if user.user_called and user.user_called > 50:
-                eligible = True
-
-            if not eligible:
-                reg = Reg.objects.filter(reg_id=user.reg_id).first()
-                if reg and reg.created_date:
-                    created_dt = normalize_datetime(reg.created_date)
-                    if created_dt and created_dt < ninety_days_ago:
-                        eligible = True
-
-            # Service/shop presence is purely informational for the summary
-            # counts below -- it no longer gates eligibility.
-            service = Service.objects.filter(user_id=user.user_id).first()
-            shop = Shop.objects.filter(user_id=user.user_id).first()
-            source_type = "service" if service else ("shop" if shop else None)
-
-            if eligible:
-                subscriber = Subscribers.objects.create(
-                    user_id=user.user_id,
-                    reg_id=user.reg_id,
-                    cat_id=user.cat_id,
-                    type="unpaid",  # default type
-                    last_pay=None,
-                    payment_history=None
-                )
-                created_subscribers.append(subscriber)
-
-                # ✅ Count service/shop
-                if source_type == "service":
-                    service_count += 1
-                elif source_type == "shop":
-                    shop_count += 1
-
-        serializer = SubscriberSerializerPost(created_subscribers, many=True)
-
-        summary = {
-            "total_new": len(created_subscribers),
-            "service_new": service_count,
-            "shop_new": shop_count
-        }
-
-        return Response({
-            "summary": summary,
-            "new_subscribers": serializer.data
-        }, status=status.HTTP_201_CREATED)
 
 
 class TermPolicyAPIView(APIView):
@@ -1694,88 +1597,48 @@ def toggle_subscriber(request, sub_id):
         return JsonResponse({"error": str(e)}, status=502)
 
 
-@csrf_exempt
-def approve_subscriber(request, sub_id):
-    """The 'Approve & Mark Paid' gateway — unlike toggle_subscriber (which
-    flips anything-not-unpaid back to unpaid), this only ever moves a row
-    forward to 'paid', whether it started as 'waiting' or 'unpaid'. Thin
-    proxy to Flask's /admin/subscribers/<user_id>/approve, which does the
-    write and sends the user a push notification."""
-    if request.method != "POST":
-        return JsonResponse({"error": "Only POST allowed"}, status=405)
-
-    try:
-        subscriber = Subscribers.objects.get(sub_id=sub_id)
-    except Subscribers.DoesNotExist:
-        return JsonResponse({"error": "Subscriber not found"}, status=404)
-
-    try:
-        result = _call_flask_admin(f'/admin/subscribers/{subscriber.user_id}/approve', {})
-        return JsonResponse({"sub_id": subscriber.sub_id, **result}, status=200)
-    except _urllib_err.HTTPError as e:
-        return JsonResponse({"error": f"Flask error {e.code}: {e.read().decode()}"}, status=502)
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=502)
-
-
-@csrf_exempt
-def reject_subscriber(request, sub_id):
-    """Rejects a waiting/unpaid request back to 'unpaid' with an admin-
-    supplied reason, proxied to Flask which persists reject_reason and
-    sends the user a push notification quoting it."""
-    if request.method != "POST":
-        return JsonResponse({"error": "Only POST allowed"}, status=405)
-
-    try:
-        subscriber = Subscribers.objects.get(sub_id=sub_id)
-    except Subscribers.DoesNotExist:
-        return JsonResponse({"error": "Subscriber not found"}, status=404)
-
-    reason = (request.POST.get('reason') or '').strip()
-    if not reason:
+class SubscriptionSettingsAPIView(APIView):
+    """Global call/view thresholds that trigger the automatic subscription
+    notice -- mirrors ContactInfoAPIView's single-row shape exactly."""
+    def get(self, request):
         try:
-            reason = (_json.loads(request.body or b'{}').get('reason') or '').strip()
-        except Exception:
-            reason = ''
-    if not reason:
-        return JsonResponse({"error": "reason is required"}, status=400)
+            settings_row = SubscriptionSettings.objects.get(id=1)
+            return Response({
+                "call_threshold": settings_row.call_threshold,
+                "view_threshold": settings_row.view_threshold,
+            }, status=status.HTTP_200_OK)
+        except SubscriptionSettings.DoesNotExist:
+            return Response({"error": "Subscription settings not found"}, status=status.HTTP_404_NOT_FOUND)
 
-    try:
-        result = _call_flask_admin(f'/admin/subscribers/{subscriber.user_id}/reject', {'reason': reason})
-        return JsonResponse({"sub_id": subscriber.sub_id, **result}, status=200)
-    except _urllib_err.HTTPError as e:
-        return JsonResponse({"error": f"Flask error {e.code}: {e.read().decode()}"}, status=502)
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=502)
+    def post(self, request):
+        try:
+            settings_row, _ = SubscriptionSettings.objects.get_or_create(id=1)
+            settings_row.call_threshold = request.data.get("call_threshold", settings_row.call_threshold)
+            settings_row.view_threshold = request.data.get("view_threshold", settings_row.view_threshold)
+            settings_row.save()
+            return Response({
+                "call_threshold": settings_row.call_threshold,
+                "view_threshold": settings_row.view_threshold,
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(['POST'])
-def notify_subscriber_usage(request, sub_id):
-    """Proxies to the Flask backend's FCM push, mirroring send_broadcast_view."""
+def set_cat_fee(request, pk):
+    category = get_object_or_404(Cat, pk=pk)
+    fee = request.data.get('fee')
     try:
-        subscriber = Subscribers.objects.get(sub_id=sub_id)
-    except Subscribers.DoesNotExist:
-        return Response({'success': False, 'message': 'Subscriber not found'}, status=404)
-
-    month_start = timezone.localtime(timezone.now()).replace(
-        day=1, hour=0, minute=0, second=0, microsecond=0)
-    monthly_calls = CallList.objects.filter(
-        user_id=subscriber.user_id, call_time__gte=month_start).count()
-    monthly_views = ViewList.objects.filter(
-        user_id=subscriber.user_id, view_time__gte=month_start).count()
-
-    try:
-        result = _call_flask_admin(
-            f'/admin/subscribers/{subscriber.user_id}/notify-usage',
-            {'monthly_calls': monthly_calls, 'monthly_views': monthly_views},
-        )
-        return Response({'success': True, **result})
-    except _urllib_err.HTTPError as e:
-        err_body = e.read().decode()
-        return Response({'success': False,
-                         'message': f'Flask error {e.code}: {err_body}'}, status=502)
-    except Exception as e:
-        return Response({'success': False, 'message': str(e)}, status=502)
+        category.subscription_fee = int(fee)
+    except (TypeError, ValueError):
+        return Response({"success": False, "message": "fee must be a number"}, status=400)
+    category.save()
+    return Response({
+        "success": True,
+        "id": category.cat_id,
+        "name": category.cat_name,
+        "subscription_fee": category.subscription_fee,
+    })
 
 
 @api_view(['GET'])

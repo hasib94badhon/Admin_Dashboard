@@ -171,6 +171,7 @@ class Cat(models.Model):
     cat_logo = models.CharField(max_length=255, blank=True, null=True)
     user_count = models.IntegerField(blank=True, null=True)
     cat_used = models.IntegerField(blank=True, null=True)
+    subscription_fee = models.IntegerField(default=0)
     status = models.BooleanField(default=True)
     yes_service = models.IntegerField()
     yes_shop = models.IntegerField()
@@ -428,20 +429,29 @@ class Shop(models.Model):
 
 
 class Subscribers(models.Model):
+    """type is just 'unpaid' / 'paid' -- rows are created automatically when
+    a user crosses the call/view threshold (see Flask's
+    app/services/subscription_notice.py), never by a self-serve request."""
     sub_id = models.AutoField(primary_key=True)
     user_id = models.IntegerField()
     reg_id = models.IntegerField()
     cat_id = models.IntegerField()
     type = models.CharField(max_length=255)
-    requested_at = models.DateTimeField(blank=True, null=True)
     last_notified_at = models.DateTimeField(blank=True, null=True)
-    last_pay = models.DateTimeField(blank=True, null=True)
-    payment_history = models.TextField(blank=True, null=True)
-    reject_reason = models.TextField(blank=True, null=True)
 
     class Meta:
         managed = False
         db_table = 'subscribers'
+
+
+class SubscriptionSettings(models.Model):
+    id = models.IntegerField(primary_key=True, default=1)
+    call_threshold = models.IntegerField(default=50)
+    view_threshold = models.IntegerField(default=100)
+
+    class Meta:
+        managed = False
+        db_table = 'subscription_settings'
 
 
 class TermPolicy(models.Model):
