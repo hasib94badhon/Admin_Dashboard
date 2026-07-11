@@ -488,6 +488,23 @@ class UserDeactivations(models.Model):
         db_table = 'user_deactivations'
 
 
+class DeletedAccount(models.Model):
+    id = models.AutoField(primary_key=True)
+    original_user_id = models.IntegerField()
+    reg_id = models.IntegerField(null=True, blank=True)
+    phone = models.CharField(max_length=20)
+    name = models.CharField(max_length=255, null=True, blank=True)
+    cat_id = models.IntegerField(null=True, blank=True)
+    photo = models.CharField(max_length=500, null=True, blank=True)
+    deleted_by = models.CharField(max_length=10)  # 'self' | 'admin'
+    reason = models.TextField(null=True, blank=True)
+    delete_time = models.DateTimeField()
+
+    class Meta:
+        managed = False
+        db_table = 'deleted_accounts'
+
+
 class UserReferrals(models.Model):
     id = models.BigAutoField(primary_key=True)
     referral_id = models.CharField(max_length=8)

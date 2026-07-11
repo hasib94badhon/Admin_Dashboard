@@ -23,6 +23,8 @@ urlpatterns = [
     path('api/login-superuser/', login_superuser),
     path('api/dashboard-stats/', dashboard_stats, name='dashboard_stats'),
     path('api/deactivated-users/', deactivated_users, name='deactivated_users'),
+    path('api/deleted-accounts/', list_deleted_accounts, name='deleted-accounts'),
+    path('api/users/<int:pk>/delete/', admin_delete_user, name='admin-delete-user'),
     path('api/referrals/', referral_list, name='referral-list'),
     path("api/referrals/<int:pk>/update/", update_referral),
     path('api/service-users/', ServiceUserList.as_view(), name='service-users'),

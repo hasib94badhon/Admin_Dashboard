@@ -1053,6 +1053,62 @@ def deactivated_users(request):
     return JsonResponse({'total': total, 'results': results}, safe=False)
 
 
+def list_deleted_accounts(request):
+    """
+    GET /api/deleted-accounts/?deleted_by=self|admin&phone=...&name=...
+    Read-only audit view over deleted_accounts (both self- and
+    admin-initiated deletions land in the same table).
+    """
+    qs = DeletedAccount.objects.all()
+
+    deleted_by = request.GET.get('deleted_by')
+    phone = request.GET.get('phone')
+    name = request.GET.get('name')
+
+    if deleted_by in ('self', 'admin'):
+        qs = qs.filter(deleted_by=deleted_by)
+    if phone:
+        qs = qs.filter(phone__icontains=phone)
+    if name:
+        qs = qs.filter(name__icontains=name)
+
+    qs = qs.order_by('-delete_time')
+    total = qs.count()
+
+    cat_ids = {row.cat_id for row in qs[:200] if row.cat_id}
+    cat_names = {c.cat_id: c.cat_name for c in Cat.objects.filter(cat_id__in=cat_ids)}
+
+    results = [{
+        'id': row.id,
+        'original_user_id': row.original_user_id,
+        'phone': row.phone,
+        'name': row.name or '',
+        'category_name': cat_names.get(row.cat_id, ''),
+        'photo': row.photo or '',
+        'deleted_by': row.deleted_by,
+        'reason': row.reason or '',
+        'delete_time': row.delete_time,
+    } for row in qs[:200]]
+
+    return JsonResponse({'total': total, 'results': results}, safe=False)
+
+
+@api_view(['POST'])
+def admin_delete_user(request, pk):
+    """Proxies to the Flask backend's account-deletion pipeline, mirroring
+    send_broadcast_view's pattern for calling into Flask."""
+    admin_note = request.data.get('admin_note')
+    try:
+        result = _call_flask_admin(f'/admin/users/{pk}/delete', {'admin_note': admin_note})
+        return Response({'success': True, **result})
+    except _urllib_err.HTTPError as e:
+        err_body = e.read().decode()
+        return Response({'success': False,
+                         'message': f'Flask error {e.code}: {err_body}'}, status=502)
+    except Exception as e:
+        return Response({'success': False, 'message': str(e)}, status=502)
+
+
 @api_view(['GET'])
 def referral_list(request):
     sort = request.GET.get('sort', 'most_recent')
