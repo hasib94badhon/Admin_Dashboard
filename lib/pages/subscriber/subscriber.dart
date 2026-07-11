@@ -38,9 +38,8 @@ class _SubscriberPageState extends State<SubscriberPage> {
 
   static const _viewOptions = [
     ('all', 'All'),
-    ('requesting', 'Requesting'),
-    ('eligible_pay', 'Eligible to Pay'),
-    ('eligible_notify', 'Notify-eligible'),
+    ('unpaid', 'Unpaid'),
+    ('paid', 'Paid'),
   ];
 
   Future<void> fetchSubscribers() async {
@@ -114,196 +113,6 @@ class _SubscriberPageState extends State<SubscriberPage> {
     }
   }
 
-  Future<void> approveSubscriber(int subId) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: const Text('Confirm Approval',
-            style: TextStyle(fontWeight: FontWeight.w700, color: textPrimary)),
-        content: const Text(
-          "Approve this subscriber and mark them as Paid/Verified?",
-          style: TextStyle(color: textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel',
-                style: TextStyle(color: textSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: ElevatedButton.styleFrom(
-                backgroundColor: successColor,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
-                elevation: 0),
-            child: const Text('Approve'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
-
-    final url = Uri.parse("$host/api/approve-subscriber/$subId/");
-    final response = await http.post(url);
-
-    if (response.statusCode == 200) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text("Subscriber approved and marked Paid"),
-        backgroundColor: successColor,
-        behavior: SnackBarBehavior.floating,
-      ));
-      fetchSubscribers();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text("Failed to approve subscriber"),
-        backgroundColor: errorColor,
-        behavior: SnackBarBehavior.floating,
-      ));
-    }
-  }
-
-  Future<void> rejectSubscriber(int subId) async {
-    final reasonController = TextEditingController();
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) {
-          final canReject = reasonController.text.trim().isNotEmpty;
-          return AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            title: const Text('Reject Request',
-                style: TextStyle(fontWeight: FontWeight.w700, color: textPrimary)),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "This sends the user a notification quoting your reason. "
-                  "The request moves back to Unpaid.",
-                  style: TextStyle(color: textSecondary),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: reasonController,
-                  autofocus: true,
-                  minLines: 2,
-                  maxLines: 4,
-                  decoration: const InputDecoration(
-                    hintText: 'Reason for rejection...',
-                    border: OutlineInputBorder(),
-                  ),
-                  onChanged: (_) => setDialogState(() {}),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(false),
-                child: const Text('Cancel',
-                    style: TextStyle(color: textSecondary)),
-              ),
-              ElevatedButton(
-                onPressed: canReject ? () => Navigator.of(ctx).pop(true) : null,
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: errorColor,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
-                    elevation: 0),
-                child: const Text('Reject'),
-              ),
-            ],
-          );
-        },
-      ),
-    );
-
-    if (confirm != true) return;
-    final reason = reasonController.text.trim();
-    if (reason.isEmpty) return;
-
-    final url = Uri.parse("$host/api/reject-subscriber/$subId/");
-    final response = await http.post(
-      url,
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode({'reason': reason}),
-    );
-
-    if (response.statusCode == 200) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text("Request rejected and user notified"),
-        backgroundColor: successColor,
-        behavior: SnackBarBehavior.floating,
-      ));
-      fetchSubscribers();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text("Failed to reject subscriber"),
-        backgroundColor: errorColor,
-        behavior: SnackBarBehavior.floating,
-      ));
-    }
-  }
-
-  Future<void> notifySubscriberUsage(int subId) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: const Text('Send Usage Notification',
-            style: TextStyle(fontWeight: FontWeight.w700, color: textPrimary)),
-        content: const Text(
-          "Notify this user about their profile usage this month?",
-          style: TextStyle(color: textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel',
-                style: TextStyle(color: textSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            style: ElevatedButton.styleFrom(
-                backgroundColor: accentColor,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
-                elevation: 0),
-            child: const Text('Send'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirm != true) return;
-
-    final url = Uri.parse("$host/api/subscriber/$subId/notify-usage/");
-    final response = await http.post(url);
-
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(data['success'] == true
-            ? "Notification sent"
-            : "Failed: ${data['message'] ?? 'unknown error'}"),
-        backgroundColor: data['success'] == true ? successColor : errorColor,
-        behavior: SnackBarBehavior.floating,
-      ));
-      fetchSubscribers();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text("Failed to send notification"),
-        backgroundColor: errorColor,
-        behavior: SnackBarBehavior.floating,
-      ));
-    }
-  }
-
   Future<void> toggleUserActiveStatus(int userId, bool currentlyActive) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -357,6 +166,189 @@ class _SubscriberPageState extends State<SubscriberPage> {
         behavior: SnackBarBehavior.floating,
       ));
     }
+  }
+
+  Future<void> _openSubscriptionSettings() async {
+    final callCtrl = TextEditingController();
+    final viewCtrl = TextEditingController();
+    final catSearchCtrl = TextEditingController();
+    List<dynamic> catResults = [];
+    bool loadingSettings = true;
+
+    Future<void> loadSettings(void Function(void Function()) setDialogState) async {
+      final res = await http.get(Uri.parse("$host/api/subscription-settings/"));
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        callCtrl.text = '${data['call_threshold'] ?? 50}';
+        viewCtrl.text = '${data['view_threshold'] ?? 100}';
+      }
+      setDialogState(() => loadingSettings = false);
+    }
+
+    Future<void> searchCats(String query, void Function(void Function()) setDialogState) async {
+      final res = await http.get(
+          Uri.parse("$host/api/cat").replace(queryParameters: {'search': query}));
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        setDialogState(() => catResults = data is List ? data : []);
+      }
+    }
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          if (loadingSettings) loadSettings(setDialogState);
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            title: const Text('Subscription Settings',
+                style: TextStyle(fontWeight: FontWeight.w700, color: textPrimary)),
+            content: SizedBox(
+              width: 460,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text('Notify a user once their profile crosses either threshold:',
+                        style: TextStyle(color: textSecondary, fontSize: 13)),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: callCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                                labelText: 'Call threshold', border: OutlineInputBorder()),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextField(
+                            controller: viewCtrl,
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                                labelText: 'View threshold', border: OutlineInputBorder()),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () async {
+                          final res = await http.post(
+                            Uri.parse("$host/api/subscription-settings/"),
+                            headers: {'Content-Type': 'application/json'},
+                            body: json.encode({
+                              'call_threshold': int.tryParse(callCtrl.text.trim()) ?? 50,
+                              'view_threshold': int.tryParse(viewCtrl.text.trim()) ?? 100,
+                            }),
+                          );
+                          if (!ctx.mounted) return;
+                          ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                            content: Text(res.statusCode == 200
+                                ? 'Thresholds saved'
+                                : 'Failed to save thresholds'),
+                            backgroundColor:
+                                res.statusCode == 200 ? successColor : errorColor,
+                            behavior: SnackBarBehavior.floating,
+                          ));
+                        },
+                        child: const Text('Save thresholds'),
+                      ),
+                    ),
+                    const Divider(height: 24),
+                    const Text('Subscription fee by category:',
+                        style: TextStyle(color: textSecondary, fontSize: 13)),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: catSearchCtrl,
+                      decoration: InputDecoration(
+                        hintText: 'Search category...',
+                        prefixIcon: const Icon(Icons.search_rounded, size: 18),
+                        border: const OutlineInputBorder(),
+                        isDense: true,
+                      ),
+                      onChanged: (v) => searchCats(v, setDialogState),
+                    ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      height: 260,
+                      child: catResults.isEmpty
+                          ? const Center(
+                              child: Text('Search for a category to edit its fee',
+                                  style: TextStyle(color: textMuted, fontSize: 12)))
+                          : ListView.builder(
+                              itemCount: catResults.length,
+                              itemBuilder: (_, i) {
+                                final cat = catResults[i];
+                                final feeCtrl = TextEditingController(
+                                    text: '${cat['subscription_fee'] ?? 0}');
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(vertical: 4),
+                                  child: Row(
+                                    children: [
+                                      Expanded(
+                                        flex: 2,
+                                        child: Text(cat['cat_name'] ?? '',
+                                            style: const TextStyle(fontSize: 13)),
+                                      ),
+                                      SizedBox(
+                                        width: 90,
+                                        child: TextField(
+                                          controller: feeCtrl,
+                                          keyboardType: TextInputType.number,
+                                          decoration: const InputDecoration(
+                                              isDense: true,
+                                              border: OutlineInputBorder()),
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.save_rounded,
+                                            size: 18, color: accentColor),
+                                        onPressed: () async {
+                                          final res = await http.post(
+                                            Uri.parse(
+                                                "$host/api/cat/${cat['cat_id']}/set-fee/"),
+                                            headers: {'Content-Type': 'application/json'},
+                                            body: json.encode(
+                                                {'fee': int.tryParse(feeCtrl.text.trim()) ?? 0}),
+                                          );
+                                          if (!ctx.mounted) return;
+                                          ScaffoldMessenger.of(ctx).showSnackBar(SnackBar(
+                                            content: Text(res.statusCode == 200
+                                                ? 'Fee saved for ${cat['cat_name']}'
+                                                : 'Failed to save fee'),
+                                            backgroundColor: res.statusCode == 200
+                                                ? successColor
+                                                : errorColor,
+                                            behavior: SnackBarBehavior.floating,
+                                          ));
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('Close'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
   }
 
   void _copyRowData(Map<String, dynamic> row) {
@@ -422,14 +414,14 @@ class _SubscriberPageState extends State<SubscriberPage> {
                     color: warningColor),
                 const SizedBox(width: 6),
                 _SummaryChip(
-                    label: 'Requesting',
-                    value: summary['requesting_count']?.toString() ?? '0',
-                    color: warningColor),
+                    label: 'Unpaid',
+                    value: summary['unpaid_count']?.toString() ?? '0',
+                    color: errorColor),
                 const SizedBox(width: 6),
                 _SummaryChip(
-                    label: 'Notify-eligible',
-                    value: summary['eligible_notify_count']?.toString() ?? '0',
-                    color: accentColor),
+                    label: 'Paid',
+                    value: summary['paid_count']?.toString() ?? '0',
+                    color: successColor),
               ],
             ],
           ),
@@ -491,42 +483,18 @@ class _SubscriberPageState extends State<SubscriberPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Add button + search row
+              // Settings button + search row
               Row(
                 children: [
                   ElevatedButton.icon(
-                    onPressed: () async {
-                      setState(() => isLoading = true);
-                      final url =
-                          Uri.parse("$host/api/create-subscribers/");
-                      final messenger = ScaffoldMessenger.of(context);
-                      final response = await http.post(url);
-                      setState(() => isLoading = false);
-                      if (response.statusCode == 201) {
-                        final data = json.decode(response.body);
-                        final s = data['summary'];
-                        messenger.showSnackBar(SnackBar(
-                          content: Text(
-                              "Added ${s['total_new']} (Service: ${s['service_new']}, Shop: ${s['shop_new']})"),
-                          backgroundColor: successColor,
-                          behavior: SnackBarBehavior.floating,
-                        ));
-                        currentPage = 1;
-                        fetchSubscribers();
-                      } else {
-                        messenger.showSnackBar(const SnackBar(
-                            content: Text("Failed to create subscribers"),
-                            backgroundColor: errorColor,
-                            behavior: SnackBarBehavior.floating));
-                      }
-                    },
-                    icon: const Icon(Icons.add_rounded,
+                    onPressed: () => _openSubscriptionSettings(),
+                    icon: const Icon(Icons.tune_rounded,
                         size: 16, color: Colors.white),
-                    label: const Text('Add Eligible Subscribers',
+                    label: const Text('Subscription Settings',
                         style:
                             TextStyle(fontSize: 13, color: Colors.white)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: successColor,
+                      backgroundColor: accentColor,
                       padding: const EdgeInsets.symmetric(
                           horizontal: 16, vertical: 13),
                       shape: RoundedRectangleBorder(
@@ -703,16 +671,10 @@ class _SubscriberPageState extends State<SubscriberPage> {
                                 label: Text('Type', style: _hStyle),
                                 fixedWidth: 90),
                             DataColumn2(
-                                label: Text('This Month', style: _hStyle),
+                                label: Text('Calls / Views', style: _hStyle),
                                 fixedWidth: 130),
                             DataColumn2(
-                                label: Text('Requested', style: _hStyle),
-                                size: ColumnSize.M),
-                            DataColumn2(
                                 label: Text('Notified', style: _hStyle),
-                                size: ColumnSize.M),
-                            DataColumn2(
-                                label: Text('Last Pay', style: _hStyle),
                                 size: ColumnSize.M),
                             DataColumn2(
                                 label:
@@ -723,10 +685,7 @@ class _SubscriberPageState extends State<SubscriberPage> {
                                 fixedWidth: 70),
                             DataColumn2(
                                 label: Text('Action', style: _hStyle),
-                                fixedWidth: 240),
-                            DataColumn2(
-                                label: Text('Notify', style: _hStyle),
-                                fixedWidth: 60),
+                                fixedWidth: 160),
                             DataColumn2(
                                 label: Text('Copy', style: _hStyle),
                                 fixedWidth: 60),
@@ -739,8 +698,6 @@ class _SubscriberPageState extends State<SubscriberPage> {
                                   (s['type'] ?? '').toString().toLowerCase();
                               final isPaid = subType == 'paid';
                               final isActive = s['user_status'] == true;
-                              final eligibleForNotify =
-                                  s['eligible_for_notification'] == true;
                               return DataRow2(
                                 cells: [
                                   DataCell(Text(
@@ -786,25 +743,13 @@ class _SubscriberPageState extends State<SubscriberPage> {
                                           color: textSecondary))),
                                   DataCell(_SubTypeBadge(type: subType)),
                                   DataCell(Text(
-                                      'C:${s['monthly_calls'] ?? 0}  V:${s['monthly_views'] ?? 0}',
-                                      style: const TextStyle(
-                                          fontSize: 12,
-                                          color: textSecondary))),
-                                  DataCell(Text(
-                                      TimeFormatter.formatBdTime(
-                                          s['requested_at'] ?? ''),
+                                      'C:${s['user_called'] ?? 0}  V:${s['user_viewed'] ?? 0}',
                                       style: const TextStyle(
                                           fontSize: 12,
                                           color: textSecondary))),
                                   DataCell(Text(
                                       TimeFormatter.formatBdTime(
                                           s['last_notified_at'] ?? ''),
-                                      style: const TextStyle(
-                                          fontSize: 12,
-                                          color: textSecondary))),
-                                  DataCell(Text(
-                                      TimeFormatter.formatBdTime(
-                                          s['last_pay'] ?? ''),
                                       style: const TextStyle(
                                           fontSize: 12,
                                           color: textSecondary))),
@@ -823,47 +768,17 @@ class _SubscriberPageState extends State<SubscriberPage> {
                                   )),
                                   DataCell(isPaid
                                       ? _ActionPill(
-                                          label: 'Revoke to Unpaid',
+                                          label: 'Mark Unpaid',
                                           color: errorColor,
                                           onTap: () => toggleSubscriber(
                                               s['sub_id'], s['type']),
                                         )
-                                      : Row(
-                                          mainAxisSize: MainAxisSize.min,
-                                          children: [
-                                            _ActionPill(
-                                              label: 'Approve & Mark Paid',
-                                              color: successColor,
-                                              onTap: () => approveSubscriber(
-                                                  s['sub_id']),
-                                            ),
-                                            if (subType == 'waiting') ...[
-                                              const SizedBox(width: 6),
-                                              _ActionPill(
-                                                label: 'Reject',
-                                                color: errorColor,
-                                                onTap: () => rejectSubscriber(
-                                                    s['sub_id']),
-                                              ),
-                                            ],
-                                          ],
+                                      : _ActionPill(
+                                          label: 'Mark Paid',
+                                          color: successColor,
+                                          onTap: () => toggleSubscriber(
+                                              s['sub_id'], s['type']),
                                         )),
-                                  DataCell(IconButton(
-                                    icon: Icon(
-                                      Icons.notifications_rounded,
-                                      size: 18,
-                                      color: eligibleForNotify
-                                          ? warningColor
-                                          : textMuted.withValues(alpha: 0.4),
-                                    ),
-                                    tooltip: eligibleForNotify
-                                        ? 'Send usage notification'
-                                        : 'Not eligible this month',
-                                    onPressed: eligibleForNotify
-                                        ? () =>
-                                            notifySubscriberUsage(s['sub_id'])
-                                        : null,
-                                  )),
                                   DataCell(IconButton(
                                     icon: const Icon(Icons.copy_rounded,
                                         size: 16, color: accentColor),
