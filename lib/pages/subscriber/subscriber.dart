@@ -166,6 +166,89 @@ class _SubscriberPageState extends State<SubscriberPage> {
     }
   }
 
+  Future<void> rejectSubscriber(int subId) async {
+    final reasonController = TextEditingController();
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final canReject = reasonController.text.trim().isNotEmpty;
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            title: const Text('Reject Request',
+                style: TextStyle(fontWeight: FontWeight.w700, color: textPrimary)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "This sends the user a notification quoting your reason. "
+                  "The request moves back to Unpaid.",
+                  style: TextStyle(color: textSecondary),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: reasonController,
+                  autofocus: true,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: const InputDecoration(
+                    hintText: 'Reason for rejection...',
+                    border: OutlineInputBorder(),
+                  ),
+                  onChanged: (_) => setDialogState(() {}),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(false),
+                child: const Text('Cancel',
+                    style: TextStyle(color: textSecondary)),
+              ),
+              ElevatedButton(
+                onPressed: canReject ? () => Navigator.of(ctx).pop(true) : null,
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: errorColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    elevation: 0),
+                child: const Text('Reject'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (confirm != true) return;
+    final reason = reasonController.text.trim();
+    if (reason.isEmpty) return;
+
+    final url = Uri.parse("$host/api/reject-subscriber/$subId/");
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: json.encode({'reason': reason}),
+    );
+
+    if (response.statusCode == 200) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text("Request rejected and user notified"),
+        backgroundColor: successColor,
+        behavior: SnackBarBehavior.floating,
+      ));
+      fetchSubscribers();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text("Failed to reject subscriber"),
+        backgroundColor: errorColor,
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
+  }
+
   Future<void> notifySubscriberUsage(int subId) async {
     final confirm = await showDialog<bool>(
       context: context,
@@ -640,7 +723,7 @@ class _SubscriberPageState extends State<SubscriberPage> {
                                 fixedWidth: 70),
                             DataColumn2(
                                 label: Text('Action', style: _hStyle),
-                                fixedWidth: 140),
+                                fixedWidth: 240),
                             DataColumn2(
                                 label: Text('Notify', style: _hStyle),
                                 fixedWidth: 60),
@@ -739,59 +822,31 @@ class _SubscriberPageState extends State<SubscriberPage> {
                                         s['user_id'], isActive),
                                   )),
                                   DataCell(isPaid
-                                      ? GestureDetector(
+                                      ? _ActionPill(
+                                          label: 'Revoke to Unpaid',
+                                          color: errorColor,
                                           onTap: () => toggleSubscriber(
                                               s['sub_id'], s['type']),
-                                          child: Container(
-                                            padding:
-                                                const EdgeInsets.symmetric(
-                                                    horizontal: 10,
-                                                    vertical: 6),
-                                            decoration: BoxDecoration(
-                                              color: errorColor.withValues(
-                                                  alpha: 0.1),
-                                              borderRadius:
-                                                  BorderRadius.circular(6),
-                                              border: Border.all(
-                                                color: errorColor
-                                                    .withValues(alpha: 0.3),
-                                              ),
-                                            ),
-                                            child: const Text(
-                                              'Revoke to Unpaid',
-                                              style: TextStyle(
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: errorColor),
-                                            ),
-                                          ),
                                         )
-                                      : GestureDetector(
-                                          onTap: () =>
-                                              approveSubscriber(s['sub_id']),
-                                          child: Container(
-                                            padding:
-                                                const EdgeInsets.symmetric(
-                                                    horizontal: 10,
-                                                    vertical: 6),
-                                            decoration: BoxDecoration(
-                                              color: successColor.withValues(
-                                                  alpha: 0.1),
-                                              borderRadius:
-                                                  BorderRadius.circular(6),
-                                              border: Border.all(
-                                                color: successColor
-                                                    .withValues(alpha: 0.3),
+                                      : Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            _ActionPill(
+                                              label: 'Approve & Mark Paid',
+                                              color: successColor,
+                                              onTap: () => approveSubscriber(
+                                                  s['sub_id']),
+                                            ),
+                                            if (subType == 'waiting') ...[
+                                              const SizedBox(width: 6),
+                                              _ActionPill(
+                                                label: 'Reject',
+                                                color: errorColor,
+                                                onTap: () => rejectSubscriber(
+                                                    s['sub_id']),
                                               ),
-                                            ),
-                                            child: const Text(
-                                              'Approve & Mark Paid',
-                                              style: TextStyle(
-                                                  fontSize: 11,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: successColor),
-                                            ),
-                                          ),
+                                            ],
+                                          ],
                                         )),
                                   DataCell(IconButton(
                                     icon: Icon(
@@ -912,6 +967,32 @@ class _SummaryChip extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                   color: color)),
         ],
+      ),
+    );
+  }
+}
+
+class _ActionPill extends StatelessWidget {
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  const _ActionPill({required this.label, required this.color, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color),
+        ),
       ),
     );
   }
