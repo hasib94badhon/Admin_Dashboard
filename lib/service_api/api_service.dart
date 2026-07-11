@@ -50,6 +50,30 @@ class DeactivationService {
   }
 }
 
+class DeletedAccountsService {
+  static Future<Map<String, dynamic>> fetchDeletedAccounts({
+    String? deletedBy,
+    String? name,
+    String? phone,
+  }) async {
+    final queryParams = {
+      if (deletedBy != null && deletedBy.isNotEmpty) 'deleted_by': deletedBy,
+      if (name != null && name.isNotEmpty) 'name': name,
+      if (phone != null && phone.isNotEmpty) 'phone': phone,
+    };
+
+    final uri = Uri.parse("$host/api/deleted-accounts/")
+        .replace(queryParameters: queryParams);
+
+    final response = await http.get(uri);
+    if (response.statusCode == 200) {
+      return jsonDecode(response.body);
+    } else {
+      throw Exception("Failed to load deleted accounts");
+    }
+  }
+}
+
 // ── Notification Admin Service ────────────────────────────────────────────────
 
 class NotificationAdminService {

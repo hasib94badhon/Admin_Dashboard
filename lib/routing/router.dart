@@ -9,6 +9,7 @@ import 'package:flutter_web_dashboard/pages/staff_admin/staff_admin.dart';
 import 'package:flutter_web_dashboard/pages/subscriber/subscriber.dart';
 import 'package:flutter_web_dashboard/pages/referral/referral.dart';
 import 'package:flutter_web_dashboard/pages/deactivation/deactivation.dart';
+import 'package:flutter_web_dashboard/pages/deleted_accounts/deleted_accounts.dart';
 import 'package:flutter_web_dashboard/pages/service/service.dart';
 import 'package:flutter_web_dashboard/pages/shop/shop.dart';
 import 'package:flutter_web_dashboard/pages/dataterms/terms.dart';
@@ -34,6 +35,8 @@ Route<dynamic> generateRoute(RouteSettings settings) {
       return _getPageRoute(const ReferralPage());
     case deactivationPageRoute:
       return _getPageRoute(const DeactivationPage());
+    case deletedAccountsPageRoute:
+      return _getPageRoute(const DeletedAccountsPage());
     case servicePageRoute:
       return _getPageRoute(const ServicePage());
     case shopPageRoute:

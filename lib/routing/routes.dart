@@ -24,6 +24,9 @@ const referralPageRoute = "/referral";
 const deactivationPageDisplayName = "User Deactivation";
 const deactivationPageRoute = "/deactivation";
 
+const deletedAccountsPageDisplayName = "Deleted Accounts";
+const deletedAccountsPageRoute = "/deleted-accounts";
+
 const servicePageDisplayName = "Service";
 const servicePageRoute = "/service";
 
@@ -61,6 +64,7 @@ List<MenuItem> sideMenuItemRoutes = [
   // MenuItem(staffAdminPageDisplayName, staffAdminPageRoute),
   MenuItem(referralPageDisplayName, referralPageRoute),
   MenuItem(deactivationPageDisplayName, deactivationPageRoute),
+  MenuItem(deletedAccountsPageDisplayName, deletedAccountsPageRoute),
   MenuItem(servicePageDisplayName, servicePageRoute),
   MenuItem(shopPageDisplayName, shopPageRoute),
   MenuItem(subscriberPageDisplayName, subscriberPageRoute),

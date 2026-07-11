@@ -29,6 +29,7 @@ class MenuController extends GetxController {
       case staffAdminPageDisplayName:     return Icons.admin_panel_settings_rounded;
       case referralPageDisplayName:       return Icons.group_add_rounded;
       case deactivationPageDisplayName:   return Icons.person_off_rounded;
+      case deletedAccountsPageDisplayName: return Icons.no_accounts_rounded;
       case servicePageDisplayName:        return Icons.miscellaneous_services_rounded;
       case shopPageDisplayName:           return Icons.storefront_rounded;
       case subscriberPageDisplayName:     return Icons.subscriptions_rounded;

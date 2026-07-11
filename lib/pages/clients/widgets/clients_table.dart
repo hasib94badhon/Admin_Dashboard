@@ -98,11 +98,14 @@ class _ClientstableState extends State<Clientstable> {
     }
   }
 
-  Future<void> usertoggleStatus(int userId) async {
+  Future<bool> usertoggleStatus(int userId) async {
     final url = Uri.parse('$host/api/user_toggle_status/$userId/');
     try {
-      await http.post(url);
-    } catch (_) {}
+      final res = await http.post(url);
+      return res.statusCode == 200;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> usertypetoggleStatus(int userId) async {
@@ -110,6 +113,115 @@ class _ClientstableState extends State<Clientstable> {
     try {
       await http.post(url);
     } catch (_) {}
+  }
+
+  Future<bool> _confirmStatusChange(bool currentlyActive) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text('Confirm Action',
+            style: TextStyle(fontWeight: FontWeight.w700, color: textPrimary)),
+        content: Text(
+          currentlyActive
+              ? 'Make this user inactive? They will still be able to open the app, but cannot post or call, and will be hidden from everyone else.'
+              : 'Reactivate this user? They will become fully visible again.',
+          style: const TextStyle(color: textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx, false),
+            child: const Text('Cancel', style: TextStyle(color: textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogCtx, true),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: currentlyActive ? errorColor : successColor,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                elevation: 0),
+            child: Text(currentlyActive ? 'Make Inactive' : 'Reactivate'),
+          ),
+        ],
+      ),
+    );
+    return confirmed ?? false;
+  }
+
+  Future<void> _confirmAndDeleteUser(int userId, String name, String phone) async {
+    final confirmCtrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (dialogCtx, setDlg) {
+          final match = confirmCtrl.text.trim() == phone.trim();
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            title: const Text('Permanently Delete User',
+                style: TextStyle(fontWeight: FontWeight.w700, color: errorColor)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'This will permanently delete "$name" and everything related to them '
+                  '(posts, reviews, notifications, calls, listings). This cannot be undone.',
+                  style: const TextStyle(color: textSecondary),
+                ),
+                const SizedBox(height: 12),
+                Text('Type their phone number ($phone) to confirm:',
+                    style: const TextStyle(fontSize: 12, color: textMuted)),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: confirmCtrl,
+                  onChanged: (_) => setDlg(() {}),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    filled: true,
+                    fillColor: background,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogCtx, false),
+                child: const Text('Cancel', style: TextStyle(color: textSecondary)),
+              ),
+              ElevatedButton(
+                onPressed: match ? () => Navigator.pop(dialogCtx, true) : null,
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: errorColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    elevation: 0),
+                child: const Text('Delete Permanently'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final res = await http.post(Uri.parse('$host/api/users/$userId/delete/'));
+    if (!mounted) return;
+    if (res.statusCode == 200) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('$name has been permanently deleted.'),
+        backgroundColor: successColor,
+        behavior: SnackBarBehavior.floating,
+      ));
+      fetchData();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Failed to delete user.'),
+        backgroundColor: errorColor,
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
   }
 
   @override
@@ -336,7 +448,7 @@ class _ClientstableState extends State<Clientstable> {
                           dataRowHeight: 60,
                           headingRowHeight: 44,
                           horizontalMargin: 16,
-                          minWidth: 780,
+                          minWidth: 860,
                           headingRowColor: WidgetStateProperty.all(background),
                           dividerThickness: 1,
                           border: TableBorder(
@@ -378,6 +490,10 @@ class _ClientstableState extends State<Clientstable> {
                             ),
                             DataColumn(
                               label: Text('Receipt',
+                                  style: _headerStyle),
+                            ),
+                            DataColumn(
+                              label: Text('Delete',
                                   style: _headerStyle),
                             ),
                           ],
@@ -460,7 +576,20 @@ class _ClientstableState extends State<Clientstable> {
                                   DataCell(GestureDetector(
                                     onTap: () async {
                                       final uid = user['user_id'] as int;
-                                      await usertoggleStatus(uid);
+                                      final confirmed =
+                                          await _confirmStatusChange(isActive);
+                                      if (!confirmed) return;
+                                      final ok = await usertoggleStatus(uid);
+                                      if (!ok) {
+                                        if (!mounted) return;
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(const SnackBar(
+                                          content:
+                                              Text('Failed to update status.'),
+                                          backgroundColor: errorColor,
+                                        ));
+                                        return;
+                                      }
                                       setState(() {
                                         userData[index]['status'] =
                                             !userData[index]['status'];
@@ -488,6 +617,33 @@ class _ClientstableState extends State<Clientstable> {
                                             Icons.download_rounded,
                                             size: 16,
                                             color: accentColor,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  // Per-row permanent delete button
+                                  DataCell(
+                                    Tooltip(
+                                      message: 'Delete permanently',
+                                      child: InkWell(
+                                        onTap: () => _confirmAndDeleteUser(
+                                          user['user_id'] as int,
+                                          user['name'].toString(),
+                                          user['phone'].toString(),
+                                        ),
+                                        borderRadius: BorderRadius.circular(8),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            color: errorColor.withValues(alpha: 0.1),
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                          child: const Icon(
+                                            Icons.delete_forever_rounded,
+                                            size: 16,
+                                            color: errorColor,
                                           ),
                                         ),
                                       ),
