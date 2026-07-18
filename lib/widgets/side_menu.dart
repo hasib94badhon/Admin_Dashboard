@@ -3,6 +3,7 @@ import 'package:flutter_web_dashboard/constants/controllers.dart';
 import 'package:flutter_web_dashboard/constants/style.dart';
 import 'package:flutter_web_dashboard/helpers/reponsiveness.dart';
 import 'package:flutter_web_dashboard/routing/routes.dart';
+import 'package:flutter_web_dashboard/service_api/auth_state.dart';
 import 'package:flutter_web_dashboard/widgets/side_menu_item.dart';
 import 'package:get/get.dart';
 
@@ -52,24 +53,16 @@ class SideMenu extends StatelessWidget {
           Expanded(
             child: ListView(
               padding: const EdgeInsets.symmetric(vertical: 8),
-              children: sideMenuItemRoutes
-                  .map((item) => SideMenuItem(
-                        itemName: item.name,
-                        onTap: () {
-                          if (item.route == authenticationPageRoute) {
-                            Get.offAllNamed(authenticationPageRoute);
-                            menuController.changeActiveItemTo(
-                                overviewPageDisplayName);
-                          } else if (!menuController.isActive(item.name)) {
-                            menuController.changeActiveItemTo(item.name);
-                            if (ResponsiveWidget.isSmallScreen(context)) {
-                              Get.back();
-                            }
-                            navigationController.navigateTo(item.route);
-                          }
-                        },
-                      ))
-                  .toList(),
+              children: [
+                for (final item in sideMenuItemRoutes)
+                  if (AuthState.canAccessPageKey(pageKeyForRoute[item.route]!))
+                    _menuTile(context, item.name, item.route),
+                // Managing other admins is superadmin-only, always -- never
+                // toggle-able like the pages above.
+                if (AuthState.isSuperAdmin)
+                  _menuTile(context, staffAdminPageDisplayName,
+                      staffAdminPageRoute),
+              ],
             ),
           ),
 
@@ -97,6 +90,24 @@ class SideMenu extends StatelessWidget {
             const SizedBox(height: 14),
         ],
       ),
+    );
+  }
+
+  Widget _menuTile(BuildContext context, String itemName, String route) {
+    return SideMenuItem(
+      itemName: itemName,
+      onTap: () {
+        if (route == authenticationPageRoute) {
+          Get.offAllNamed(authenticationPageRoute);
+          menuController.changeActiveItemTo(overviewPageDisplayName);
+        } else if (!menuController.isActive(itemName)) {
+          menuController.changeActiveItemTo(itemName);
+          if (ResponsiveWidget.isSmallScreen(context)) {
+            Get.back();
+          }
+          navigationController.navigateTo(route);
+        }
+      },
     );
   }
 }

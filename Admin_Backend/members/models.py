@@ -5,6 +5,7 @@
 #   * Make sure each ForeignKey and OneToOneField has `on_delete` set to the desired behavior
 #   * Remove `managed = False` lines if you wish to allow Django to create, modify, and delete the table
 # Feel free to rename the models, but don't rename db_table values or field names.
+from django.conf import settings
 from django.db import models
 
 
@@ -27,6 +28,10 @@ class Users(models.Model):
     user_called = models.IntegerField()
     user_total_post = models.IntegerField()
     user_logged_date = models.DateTimeField(blank=True, null=True)
+    # Written by Flask's /update_activity on a ~60s heartbeat while the app is
+    # foregrounded (see app_backend-main/app/routes/activity.py). Distinct
+    # from user_logged_date, which only updates once per app open.
+    last_heartbeat = models.DateTimeField(blank=True, null=True)
     call_status = models.CharField(max_length=10, blank=True, null=True)
     nid = models.TextField()
     tin = models.TextField()
@@ -610,3 +615,21 @@ class NotificationSendLog(models.Model):
     class Meta:
         managed  = False
         db_table = 'notification_send_log'
+
+
+# ── Admin roles & page access ────────────────────────────────────────────────
+
+class AdminProfile(models.Model):
+    """Attached to non-superuser staff accounts created via the Manage Admins
+    page. `allowed_pages` holds page-key strings from members.permissions.PAGE_KEYS.
+    Superusers never need one -- they always have full access. Unlike the rest
+    of this app's models, this table is actually owned/created by Django."""
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='admin_profile')
+    allowed_pages = models.JSONField(default=list, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True,
+                                    on_delete=models.SET_NULL, related_name='+')
+
+    class Meta:
+        managed = True
+        db_table = 'admin_profile'

@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:universal_html/html.dart' as html;
 import 'package:flutter_web_dashboard/config.dart';
+import 'package:flutter_web_dashboard/service_api/auth_headers.dart';
 
 class Clientstable extends StatefulWidget {
   const Clientstable({super.key});
@@ -37,7 +38,7 @@ class _ClientstableState extends State<Clientstable> {
       } else {
         apiUrl += '?sort=${selectedSort.toLowerCase()}';
       }
-      final response = await http.get(Uri.parse(apiUrl));
+      final response = await http.get(Uri.parse(apiUrl), headers: authHeaders());
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
         if (responseData.containsKey('users')) {
@@ -69,7 +70,7 @@ class _ClientstableState extends State<Clientstable> {
   Future<void> downloadUserData(BuildContext context, String? userId) async {
     try {
       String apiUrl = '$host/api/download-user/?user_id=$userId';
-      final response = await http.get(Uri.parse(apiUrl));
+      final response = await http.get(Uri.parse(apiUrl), headers: authHeaders());
       if (response.statusCode == 200) {
         final contentDisposition = response.headers['Content-Disposition'];
         final fileName = contentDisposition != null
@@ -101,7 +102,7 @@ class _ClientstableState extends State<Clientstable> {
   Future<bool> usertoggleStatus(int userId) async {
     final url = Uri.parse('$host/api/user_toggle_status/$userId/');
     try {
-      final res = await http.post(url);
+      final res = await http.post(url, headers: authHeaders());
       return res.statusCode == 200;
     } catch (_) {
       return false;
@@ -111,7 +112,7 @@ class _ClientstableState extends State<Clientstable> {
   Future<void> usertypetoggleStatus(int userId) async {
     final url = Uri.parse('$host/api/user-type-toggle-status/$userId/');
     try {
-      await http.post(url);
+      await http.post(url, headers: authHeaders());
     } catch (_) {}
   }
 
@@ -206,7 +207,8 @@ class _ClientstableState extends State<Clientstable> {
 
     if (confirmed != true) return;
 
-    final res = await http.post(Uri.parse('$host/api/users/$userId/delete/'));
+    final res = await http.post(Uri.parse('$host/api/users/$userId/delete/'),
+        headers: authHeaders());
     if (!mounted) return;
     if (res.statusCode == 200) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(

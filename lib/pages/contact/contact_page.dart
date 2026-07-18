@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_web_dashboard/config.dart';
 import 'package:flutter_web_dashboard/constants/style.dart';
+import 'package:flutter_web_dashboard/service_api/auth_headers.dart';
 
 class ContactPage extends StatefulWidget {
   const ContactPage({super.key});
@@ -40,7 +41,8 @@ class _ContactPageState extends State<ContactPage> {
   Future<void> _fetch() async {
     setState(() => isLoading = true);
     try {
-      final res = await http.get(Uri.parse('$host/api/contact-info/'));
+      final res = await http.get(Uri.parse('$host/api/contact-info/'),
+          headers: authHeaders());
       if (res.statusCode == 200) {
         final data = json.decode(utf8.decode(res.bodyBytes));
         _phoneCtrl.text    = data['phone']    ?? '';
@@ -59,7 +61,7 @@ class _ContactPageState extends State<ContactPage> {
     try {
       final res = await http.post(
         Uri.parse('$host/api/contact-info/'),
-        headers: {'Content-Type': 'application/json'},
+        headers: authHeaders(),
         body: json.encode({
           'phone':    _phoneCtrl.text.trim(),
           'email':    _emailCtrl.text.trim(),

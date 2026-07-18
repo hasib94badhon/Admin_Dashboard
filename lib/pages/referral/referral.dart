@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_web_dashboard/config.dart';
 import 'package:flutter_web_dashboard/constants/style.dart';
+import 'package:flutter_web_dashboard/service_api/auth_headers.dart';
 
 class ReferralPage extends StatefulWidget {
   const ReferralPage({super.key});
@@ -36,8 +37,10 @@ class _ReferralPageState extends State<ReferralPage> {
   Future<void> _load({String? sort, String? search, String? searchType}) async {
     setState(() => loading = true);
     try {
-      final response = await http.get(Uri.parse(
-          "$host/api/referrals/?sort=${sort ?? currentSort}&${searchType ?? currentSearchType}=${search ?? ''}"));
+      final response = await http.get(
+          Uri.parse(
+              "$host/api/referrals/?sort=${sort ?? currentSort}&${searchType ?? currentSearchType}=${search ?? ''}"),
+          headers: authHeaders());
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         setState(() {
@@ -63,7 +66,7 @@ class _ReferralPageState extends State<ReferralPage> {
 
     final response = await http.patch(
       Uri.parse("$host/api/referrals/$id/update/"),
-      headers: {"Content-Type": "application/json"},
+      headers: authHeaders(),
       body: jsonEncode(body),
     );
 

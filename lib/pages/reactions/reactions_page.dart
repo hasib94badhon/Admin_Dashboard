@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_web_dashboard/config.dart';
 import 'package:flutter_web_dashboard/constants/style.dart';
+import 'package:flutter_web_dashboard/service_api/auth_headers.dart';
 
 class ReactionsPage extends StatefulWidget {
   const ReactionsPage({super.key});
@@ -48,7 +49,7 @@ class _ReactionsPageState extends State<ReactionsPage> {
     try {
       final uri = Uri.parse(
           '$host/api/reactions/?tab=$_tab&page=$_page&sort=$_sort&search=${Uri.encodeQueryComponent(_searchCtrl.text.trim())}');
-      final res = await http.get(uri);
+      final res = await http.get(uri, headers: authHeaders());
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
         setState(() {

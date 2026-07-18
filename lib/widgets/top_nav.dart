@@ -114,6 +114,9 @@ AppBar topNavigationBar(BuildContext context, GlobalKey<ScaffoldState> key) {
           if (value == 'logout') {
             storage.write('isLoggedIn', false);
             storage.remove('admin_username');
+            storage.remove('auth_token');
+            storage.remove('is_superadmin');
+            storage.remove('allowed_pages');
             Get.offAllNamed(authenticationPageRoute);
           }
         },

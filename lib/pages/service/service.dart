@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:data_table_2/data_table_2.dart';
 import 'package:flutter_web_dashboard/config.dart';
 import 'package:flutter_web_dashboard/constants/style.dart';
+import 'package:flutter_web_dashboard/service_api/auth_headers.dart';
 
 class ServicePage extends StatefulWidget {
   const ServicePage({super.key});
@@ -42,7 +43,7 @@ class _ServicePageState extends State<ServicePage> {
     setState(() => isLoading = true);
     final url = Uri.parse(
         "$host/api/service-users/?page=$currentPage&search=$searchQuery&sort=$sortBy");
-    final response = await http.get(url);
+    final response = await http.get(url, headers: authHeaders());
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       final resultBlock = data['results'];

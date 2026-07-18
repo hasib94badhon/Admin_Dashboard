@@ -28,6 +28,11 @@ from datetime import timedelta, datetime
 from django.db.models.functions import TruncDate,TruncMonth,Coalesce
 from rest_framework import status
 from rest_framework.pagination import PageNumberPagination
+from rest_framework.authtoken.models import Token
+from django.contrib.auth.models import User
+from .permissions import (
+    page_access, superuser_required, HasPageAccess, IsSuperUser, PAGE_KEYS,
+)
 
 
 # bd_timezone = pytz.timezone("Asia/Dhaka") 
@@ -52,24 +57,127 @@ def login_superuser(request):
 
     user = authenticate(username=username, password=password)
 
-    if user is not None and user.is_superuser:
-        return Response({
-            'success': True,
-            'message': 'Login successful',
-            'user': {
-                'id': user.id,
-                'username': user.username,
-                'email': user.email,
-                'is_superuser': user.is_superuser,
-                'is_staff': user.is_staff,
-            }
-        })
-    else:
+    if user is None or not user.is_active:
         return Response({
             'success': False,
-            'message': 'Invalid credentials or not a superuser'
+            'message': 'Invalid credentials or account disabled'
         })
 
+    allowed_pages = list(PAGE_KEYS) if user.is_superuser else list(
+        getattr(getattr(user, 'admin_profile', None), 'allowed_pages', []) or []
+    )
+
+    if not user.is_superuser and not hasattr(user, 'admin_profile'):
+        return Response({
+            'success': False,
+            'message': 'This account is not authorized to access the admin panel'
+        })
+
+    token, _ = Token.objects.get_or_create(user=user)
+
+    return Response({
+        'success': True,
+        'message': 'Login successful',
+        'token': token.key,
+        'user': {
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'is_superuser': user.is_superuser,
+            'is_staff': user.is_staff,
+            'allowed_pages': allowed_pages,
+        }
+    })
+
+
+# ── Admin management (superadmin only) ───────────────────────────────────────
+# Deliberately guarded with @superuser_required, not @page_access -- no page
+# toggle should ever be able to grant the ability to manage other admins.
+
+@api_view(['GET'])
+@superuser_required
+def list_admins(request):
+    profiles = AdminProfile.objects.select_related('user').all()
+    results = [{
+        'id': p.user.id,
+        'username': p.user.username,
+        'email': p.user.email,
+        'is_active': p.user.is_active,
+        'allowed_pages': p.allowed_pages,
+        'date_joined': p.user.date_joined,
+        'created_at': p.created_at,
+    } for p in profiles]
+    return Response({'success': True, 'results': results})
+
+
+@api_view(['POST'])
+@superuser_required
+def create_admin(request):
+    username = (request.data.get('username') or '').strip()
+    password = request.data.get('password') or ''
+    email = (request.data.get('email') or '').strip()
+    allowed_pages = [p for p in (request.data.get('allowed_pages') or []) if p in PAGE_KEYS]
+
+    if not username or not password:
+        return Response({'success': False, 'message': 'Username and password are required'}, status=400)
+    if User.objects.filter(username=username).exists():
+        return Response({'success': False, 'message': 'Username already exists'}, status=400)
+
+    user = User.objects.create_user(username=username, email=email, password=password,
+                                     is_staff=True, is_superuser=False)
+    AdminProfile.objects.create(user=user, allowed_pages=allowed_pages, created_by=request.user)
+
+    return Response({
+        'success': True,
+        'message': 'Admin created',
+        'admin': {
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'is_active': user.is_active,
+            'allowed_pages': allowed_pages,
+        }
+    }, status=201)
+
+
+@api_view(['PATCH'])
+@superuser_required
+def update_admin_permissions(request, pk):
+    profile = get_object_or_404(AdminProfile, user_id=pk)
+    allowed_pages = [p for p in (request.data.get('allowed_pages') or []) if p in PAGE_KEYS]
+    profile.allowed_pages = allowed_pages
+    profile.save(update_fields=['allowed_pages'])
+    return Response({'success': True, 'allowed_pages': profile.allowed_pages})
+
+
+@api_view(['PATCH'])
+@superuser_required
+def toggle_admin_active(request, pk):
+    profile = get_object_or_404(AdminProfile, user_id=pk)
+    user = profile.user
+    user.is_active = not user.is_active
+    user.save(update_fields=['is_active'])
+    return Response({'success': True, 'is_active': user.is_active})
+
+
+@api_view(['DELETE'])
+@superuser_required
+def delete_admin(request, pk):
+    profile = get_object_or_404(AdminProfile, user_id=pk)
+    profile.user.delete()
+    return Response({'success': True, 'message': 'Admin deleted'})
+
+
+@api_view(['PATCH'])
+@superuser_required
+def reset_admin_password(request, pk):
+    profile = get_object_or_404(AdminProfile, user_id=pk)
+    new_password = request.data.get('password') or ''
+    if not new_password:
+        return Response({'success': False, 'message': 'Password is required'}, status=400)
+    profile.user.set_password(new_password)
+    profile.user.save(update_fields=['password'])
+    return Response({'success': True, 'message': 'Password reset'})
 
 
 # def data_view(request):
@@ -79,6 +187,9 @@ def login_superuser(request):
 def str_to_bool(val):
     return val.lower() in ('true', '1', 'yes','True','False')
 class UsersAPIView(APIView):
+    permission_classes = [HasPageAccess]
+    page_key = 'clients'
+
     def get(self, request):
         users = Users.objects.all()  # Query all products
         serializer = UserModelSerializer(users, many=True)
@@ -92,6 +203,8 @@ class UsersAPIView(APIView):
         return Response(serializer.errors, status=400)
 
 class UserListCreateView(ListCreateAPIView):
+    permission_classes = [HasPageAccess]
+    page_key = 'clients'
     queryset = Users.objects.all()
     serializer_class = UserModelSerializer
 
@@ -99,6 +212,11 @@ class UserListCreateView(ListCreateAPIView):
 
 
 class CatAPIView(APIView):
+    permission_classes = [HasPageAccess]
+    # Also read (search dropdown) from the Subscribers page -- see
+    # lib/pages/subscriber/subscriber.dart's category search.
+    page_key = ['drivers', 'subscribers']
+
     def get(self, request):
         # Base queryset
         cat = Cat.objects.all()
@@ -129,6 +247,9 @@ class CatAPIView(APIView):
 
 
 class CountAPIView(APIView):
+    permission_classes = [HasPageAccess]
+    page_key = 'overview'
+
     def get(self, request):
         # Count for each model
         user_count = Users.objects.count()
@@ -144,6 +265,7 @@ class CountAPIView(APIView):
         return Response(response_data)
 
 @csrf_exempt
+@page_access('insert')
 def insert_cat(request):
     if request.method == 'POST':
         cat_name = request.POST.get('cat_name')
@@ -278,6 +400,7 @@ def insert_cat(request):
 #         return JsonResponse({"error": str(e)}, status=500)
 
 @csrf_exempt
+@page_access('insert')
 def upload_excel(request):
     if request.method != "POST":
         return JsonResponse({"error": "Only POST requests are allowed"}, status=405)
@@ -393,6 +516,7 @@ def upload_excel(request):
 
 
 @csrf_exempt
+@page_access('insert')
 def upload_hotline_numbers_excel(request):
     if request.method != "POST":
         return JsonResponse({"error": "Only POST requests are allowed"}, status=405)
@@ -458,6 +582,7 @@ def upload_hotline_numbers_excel(request):
 
 #Insert useful app links from excel file
 @csrf_exempt
+@page_access('insert')
 def apps_links_excel(request):
     if request.method != "POST":
         return JsonResponse({"error": "Only POST requests are allowed"}, status=405)
@@ -504,6 +629,7 @@ def apps_links_excel(request):
 # insert fb_page page from excel file 
 
 @csrf_exempt
+@page_access('insert')
 def fb_page_excel(request):
     if request.method != "POST":
         return JsonResponse({"error": "Only POST requests are allowed"}, status=405)
@@ -589,6 +715,7 @@ def fb_page_excel(request):
 
 
 @api_view(['POST'])
+@page_access('drivers')
 def toggle_status(request, pk):
     category = get_object_or_404(Cat, pk=pk)
     category.status = not category.status
@@ -603,6 +730,7 @@ def toggle_status(request, pk):
 
 
 @api_view(['POST'])
+@page_access('clients', 'subscribers')
 def user_toggle_status(request, pk):
     user = get_object_or_404(Users, pk=pk)
         # Toggle status (1 becomes 0 and 0 becomes 1)
@@ -638,6 +766,7 @@ def user_toggle_status(request, pk):
 #     return JsonResponse({"error": "Invalid request method."}, status=400)
 
 @api_view(['POST'])
+@page_access('clients')
 def user_type_toggle_status(request, pk):
     user = get_object_or_404(Users, pk=pk)
     # Toggle between 'PAID' and 'FREE'
@@ -660,6 +789,7 @@ def user_type_toggle_status(request, pk):
 
 
 
+@page_access('clients')
 def get_users(request):
     """
     API to fetch, search, and sort Users data based on different criteria.
@@ -730,6 +860,7 @@ def get_users(request):
     return JsonResponse({'error': 'Invalid request method'}, status=405)
 
 
+@page_access('clients')
 def download_user(request):
     """
     API to fetch and download a specific user's data as a PDF.
@@ -795,6 +926,7 @@ def download_user(request):
 
 
 @api_view(['GET'])
+@page_access('overview')
 def dashboard_stats(request):
     # today_start = datetime.combine(now().date(), datetime.min.time()).replace(tzinfo=timezone.utc)
     # today_end = datetime.combine(now().date(), datetime.max.time()).replace(tzinfo=timezone.utc)
@@ -962,6 +1094,7 @@ def dashboard_stats(request):
 
 
 
+@page_access('deactivation')
 def deactivated_users(request):
     """
     GET /api/deactivated-users/?sort=most_recent|most_called|most_viewed
@@ -1053,6 +1186,7 @@ def deactivated_users(request):
     return JsonResponse({'total': total, 'results': results}, safe=False)
 
 
+@page_access('deleted_accounts')
 def list_deleted_accounts(request):
     """
     GET /api/deleted-accounts/?deleted_by=self|admin&phone=...&name=...
@@ -1094,6 +1228,7 @@ def list_deleted_accounts(request):
 
 
 @api_view(['POST'])
+@page_access('clients')
 def admin_delete_user(request, pk):
     """Proxies to the Flask backend's account-deletion pipeline, mirroring
     send_broadcast_view's pattern for calling into Flask."""
@@ -1110,6 +1245,7 @@ def admin_delete_user(request, pk):
 
 
 @api_view(['GET'])
+@page_access('referral')
 def referral_list(request):
     sort = request.GET.get('sort', 'most_recent')
     search_user_id = request.GET.get('user_id')
@@ -1157,6 +1293,7 @@ def referral_list(request):
     })
 
 @api_view(['PATCH'])
+@page_access('referral')
 def update_referral(request, pk):
     try:
         referral = UserReferrals.objects.get(pk=pk)
@@ -1199,6 +1336,9 @@ class ServiceUserPagination(PageNumberPagination):
           
 
 class ServiceUserList(APIView):
+    permission_classes = [HasPageAccess]
+    page_key = 'service'
+
     def get(self, request):
         queryset = Service.objects.all().order_by('service_id')
 
@@ -1290,6 +1430,9 @@ class ShopUserPagination(PageNumberPagination):
           
 
 class ShopUserList(APIView):
+    permission_classes = [HasPageAccess]
+    page_key = 'shop'
+
     def get(self, request):
         queryset = Shop.objects.all().order_by('shop_id')
 
@@ -1380,6 +1523,9 @@ class SubscriberPagination(PageNumberPagination):
     max_page_size = 100
 
 class SubscriberListView(APIView):
+    permission_classes = [HasPageAccess]
+    page_key = 'subscribers'
+
     def get(self, request):
         queryset = Subscribers.objects.all()
 
@@ -1472,6 +1618,9 @@ class SubscriberListView(APIView):
 
 
 class TermPolicyAPIView(APIView):
+    permission_classes = [HasPageAccess]
+    page_key = 'terms'
+
     # here I get and post the data collector instruction
     def get(self, request):
         """
@@ -1502,6 +1651,9 @@ class TermPolicyAPIView(APIView):
 
 
 class ContactInfoAPIView(APIView):
+    permission_classes = [HasPageAccess]
+    page_key = 'contact'
+
     def get(self, request):
         try:
             info = ContactInfo.objects.get(id=1)
@@ -1536,6 +1688,7 @@ class ContactInfoAPIView(APIView):
 
 
 @api_view(['GET'])
+@page_access('overview')
 def overview_stats(request):
     """
     Single endpoint for the Overview/Dashboard page.
@@ -1551,6 +1704,13 @@ def overview_stats(request):
     paid_subscribers    = Subscribers.objects.filter(type__iexact='paid').count()
     unpaid_subscribers  = Subscribers.objects.filter(type__iexact='unpaid').count()
     total_referrals     = UserReferrals.objects.count()
+
+    # Concurrently "online" — heartbeat within the last 3 minutes (the app
+    # pings every ~60s while foregrounded, so this allows for one or two
+    # missed beats before dropping someone from the count).
+    active_now = Users.objects.filter(
+        last_heartbeat__gte=now() - timedelta(minutes=3)
+    ).count()
 
     # Count of Description records per DesCat, sorted by most used
     des_cat_counts = list(
@@ -1571,11 +1731,13 @@ def overview_stats(request):
         "paid_subscribers":    paid_subscribers,
         "unpaid_subscribers":  unpaid_subscribers,
         "total_referrals":     total_referrals,
+        "active_now":          active_now,
         "des_cat_counts":      des_cat_counts,
     })
 
 
 @csrf_exempt
+@page_access('subscribers')
 def toggle_subscriber(request, sub_id):
     """Thin proxy to Flask's /admin/subscribers/<user_id>/toggle -- Flask
     owns the actual subscribers-table write now (and FCM), matching the
@@ -1600,6 +1762,9 @@ def toggle_subscriber(request, sub_id):
 class SubscriptionSettingsAPIView(APIView):
     """Global call/view thresholds that trigger the automatic subscription
     notice -- mirrors ContactInfoAPIView's single-row shape exactly."""
+    permission_classes = [HasPageAccess]
+    page_key = 'subscribers'
+
     def get(self, request):
         try:
             settings_row = SubscriptionSettings.objects.get(id=1)
@@ -1625,6 +1790,7 @@ class SubscriptionSettingsAPIView(APIView):
 
 
 @api_view(['POST'])
+@page_access('subscribers')
 def set_cat_fee(request, pk):
     category = get_object_or_404(Cat, pk=pk)
     fee = request.data.get('fee')
@@ -1642,6 +1808,7 @@ def set_cat_fee(request, pk):
 
 
 @api_view(['GET'])
+@page_access('appstatus')
 def app_status(request):
     from datetime import timedelta
     today = now().date()
@@ -1678,6 +1845,7 @@ def app_status(request):
 
 
 @api_view(['GET'])
+@page_access('reactions')
 def reactions(request):
     tab    = request.GET.get('tab', 'views')
     search = request.GET.get('search', '').strip()
@@ -1753,6 +1921,7 @@ def reactions(request):
 
 
 @api_view(['POST'])
+@page_access('insert')
 def insert_des_cat(request):
     des_cat_name = request.data.get('des_cat_name', '').strip()
     if not des_cat_name:
@@ -1777,6 +1946,7 @@ def _sub_cat_to_dict(s):
 
 
 @api_view(['GET'])
+@page_access('insert')
 def list_des_sub_categories(request):
     """GET /api/des-sub-categories/?des_cat_id=X  — list all or by category."""
     qs = DesSubCat.objects.all()
@@ -1787,6 +1957,7 @@ def list_des_sub_categories(request):
 
 
 @api_view(['GET'])
+@page_access('insert')
 def list_des_categories_simple(request):
     """GET /api/des-categories/ — for dropdown in admin panel."""
     cats = DesCat.objects.all().values('des_cat_id', 'des_cat_name').order_by('des_cat_id')
@@ -1794,6 +1965,7 @@ def list_des_categories_simple(request):
 
 
 @api_view(['POST'])
+@page_access('insert')
 def create_des_sub_category(request):
     """POST /api/des-sub-categories/create/"""
     des_cat_id = request.data.get('des_cat_id')
@@ -1823,6 +1995,7 @@ def create_des_sub_category(request):
 
 
 @api_view(['PUT'])
+@page_access('insert')
 def update_des_sub_category(request, pk):
     """PUT /api/des-sub-categories/<pk>/update/"""
     try:
@@ -1839,6 +2012,7 @@ def update_des_sub_category(request, pk):
 
 
 @api_view(['DELETE'])
+@page_access('insert')
 def delete_des_sub_category(request, pk):
     """DELETE /api/des-sub-categories/<pk>/delete/"""
     try:
@@ -1861,6 +2035,7 @@ def _suggestion_to_dict(s):
 
 
 @api_view(['GET'])
+@page_access('insert')
 def list_des_cat_suggestions(request):
     """GET /api/des-cat-suggestions/?des_sub_cat_id=X — list suggestions for a sub-category."""
     des_sub_cat_id = request.query_params.get('des_sub_cat_id')
@@ -1871,6 +2046,7 @@ def list_des_cat_suggestions(request):
 
 
 @api_view(['POST'])
+@page_access('insert')
 def create_des_cat_suggestion(request):
     """POST /api/des-cat-suggestions/create/"""
     des_sub_cat_id  = request.data.get('des_sub_cat_id')
@@ -1893,6 +2069,7 @@ def create_des_cat_suggestion(request):
 
 
 @api_view(['PUT'])
+@page_access('insert')
 def update_des_cat_suggestion(request, pk):
     """PUT /api/des-cat-suggestions/<pk>/update/"""
     try:
@@ -1908,6 +2085,7 @@ def update_des_cat_suggestion(request, pk):
 
 
 @api_view(['DELETE'])
+@page_access('insert')
 def delete_des_cat_suggestion(request, pk):
     """DELETE /api/des-cat-suggestions/<pk>/delete/"""
     try:
@@ -2019,12 +2197,14 @@ def _call_flask_admin(path, body_dict=None):
 # ── Notification Rules ───────────────────────────────────────────────────────
 
 @api_view(['GET'])
+@page_access('notifications')
 def list_notification_rules(request):
     rules = NotificationRule.objects.all().order_by('-rule_id')
     return Response({'success': True, 'rules': [_rule_to_dict(r) for r in rules]})
 
 
 @api_view(['POST'])
+@page_access('notifications')
 def create_notification_rule(request):
     data           = request.data
     rule_name      = (data.get('rule_name') or '').strip()
@@ -2047,6 +2227,7 @@ def create_notification_rule(request):
 
 
 @api_view(['PUT', 'PATCH'])
+@page_access('notifications')
 def update_notification_rule(request, pk):
     try:
         rule = NotificationRule.objects.get(pk=pk)
@@ -2067,6 +2248,7 @@ def update_notification_rule(request, pk):
 
 
 @api_view(['DELETE'])
+@page_access('notifications')
 def delete_notification_rule(request, pk):
     try:
         NotificationRule.objects.get(pk=pk).delete()
@@ -2078,6 +2260,7 @@ def delete_notification_rule(request, pk):
 # ── Broadcasts ───────────────────────────────────────────────────────────────
 
 @api_view(['GET'])
+@page_access('notifications')
 def list_broadcasts(request):
     bcs = BroadcastNotification.objects.all().order_by('-id')[:100]
     return Response({'success': True,
@@ -2085,6 +2268,7 @@ def list_broadcasts(request):
 
 
 @api_view(['POST'])
+@page_access('notifications')
 def create_broadcast(request):
     data           = request.data
     title          = (data.get('title') or '').strip()
@@ -2107,6 +2291,7 @@ def create_broadcast(request):
 
 
 @api_view(['POST'])
+@page_access('notifications')
 def send_broadcast_view(request, pk):
     try:
         bc = BroadcastNotification.objects.get(pk=pk)
@@ -2130,6 +2315,7 @@ def send_broadcast_view(request, pk):
 # ── Send Log ─────────────────────────────────────────────────────────────────
 
 @api_view(['GET'])
+@page_access('notifications')
 def notification_send_logs(request):
     page      = max(1, int(request.query_params.get('page', 1)))
     page_size = min(100, max(1, int(request.query_params.get('page_size', 50))))
@@ -2157,6 +2343,7 @@ def notification_send_logs(request):
 # ── Supporting dropdowns ─────────────────────────────────────────────────────
 
 @api_view(['GET'])
+@page_access('notifications')
 def notification_des_categories(request):
     cats = DesCat.objects.all().order_by('des_cat_id')
     return Response({
@@ -2169,6 +2356,7 @@ def notification_des_categories(request):
 
 
 @api_view(['GET'])
+@page_access('notifications')
 def notification_des_sub_categories(request):
     des_cat_id = request.query_params.get('des_cat_id')
     qs = DesSubCat.objects.all().order_by('des_cat_id', 'sort_order')
@@ -2189,6 +2377,7 @@ def notification_des_sub_categories(request):
 
 
 @api_view(['GET'])
+@page_access('notifications')
 def notification_user_categories(request):
     cats = Cat.objects.filter(status=True).order_by('cat_id')
     return Response({

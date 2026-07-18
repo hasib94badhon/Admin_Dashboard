@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_web_dashboard/config.dart';
 import 'package:flutter_web_dashboard/constants/style.dart';
+import 'package:flutter_web_dashboard/service_api/auth_headers.dart';
 import 'package:http/http.dart' as http;
 import 'package:data_table_2/data_table_2.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -46,7 +47,7 @@ class _SubscriberPageState extends State<SubscriberPage> {
     setState(() => isLoading = true);
     final url = Uri.parse(
         "$host/api/subscriber-users/?page=$currentPage&search=$searchQuery&sort=$sortBy&view=$panelView");
-    final response = await http.get(url);
+    final response = await http.get(url, headers: authHeaders());
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
       setState(() {
@@ -94,7 +95,7 @@ class _SubscriberPageState extends State<SubscriberPage> {
     if (confirm != true) return;
 
     final url = Uri.parse("$host/api/toggle-subscriber/$subId/");
-    final response = await http.post(url);
+    final response = await http.post(url, headers: authHeaders());
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
@@ -149,7 +150,7 @@ class _SubscriberPageState extends State<SubscriberPage> {
     if (confirm != true) return;
 
     final url = Uri.parse("$host/api/user_toggle_status/$userId/");
-    final response = await http.post(url);
+    final response = await http.post(url, headers: authHeaders());
 
     if (response.statusCode == 200) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
@@ -176,7 +177,8 @@ class _SubscriberPageState extends State<SubscriberPage> {
     bool loadingSettings = true;
 
     Future<void> loadSettings(void Function(void Function()) setDialogState) async {
-      final res = await http.get(Uri.parse("$host/api/subscription-settings/"));
+      final res = await http.get(Uri.parse("$host/api/subscription-settings/"),
+          headers: authHeaders());
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
         callCtrl.text = '${data['call_threshold'] ?? 50}';
@@ -187,7 +189,8 @@ class _SubscriberPageState extends State<SubscriberPage> {
 
     Future<void> searchCats(String query, void Function(void Function()) setDialogState) async {
       final res = await http.get(
-          Uri.parse("$host/api/cat").replace(queryParameters: {'search': query}));
+          Uri.parse("$host/api/cat").replace(queryParameters: {'search': query}),
+          headers: authHeaders());
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
         setDialogState(() => catResults = data is List ? data : []);
@@ -241,7 +244,7 @@ class _SubscriberPageState extends State<SubscriberPage> {
                         onPressed: () async {
                           final res = await http.post(
                             Uri.parse("$host/api/subscription-settings/"),
-                            headers: {'Content-Type': 'application/json'},
+                            headers: authHeaders(),
                             body: json.encode({
                               'call_threshold': int.tryParse(callCtrl.text.trim()) ?? 50,
                               'view_threshold': int.tryParse(viewCtrl.text.trim()) ?? 100,
@@ -313,7 +316,7 @@ class _SubscriberPageState extends State<SubscriberPage> {
                                           final res = await http.post(
                                             Uri.parse(
                                                 "$host/api/cat/${cat['cat_id']}/set-fee/"),
-                                            headers: {'Content-Type': 'application/json'},
+                                            headers: authHeaders(),
                                             body: json.encode(
                                                 {'fee': int.tryParse(feeCtrl.text.trim()) ?? 0}),
                                           );

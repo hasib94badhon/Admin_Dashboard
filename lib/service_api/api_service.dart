@@ -1,10 +1,12 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter_web_dashboard/config.dart';
+import 'package:flutter_web_dashboard/service_api/auth_headers.dart';
 
 class DashboardService {
   static Future<Map<String, dynamic>> fetchStats() async {
-    final response = await http.get(Uri.parse("$host/api/dashboard-stats/"));
+    final response =
+        await http.get(Uri.parse("$host/api/dashboard-stats/"), headers: authHeaders());
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     } else {
@@ -13,7 +15,8 @@ class DashboardService {
   }
 
   static Future<Map<String, dynamic>> fetchOverviewStats() async {
-    final response = await http.get(Uri.parse("$host/api/overview-stats/"));
+    final response =
+        await http.get(Uri.parse("$host/api/overview-stats/"), headers: authHeaders());
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     } else {
@@ -41,7 +44,7 @@ class DeactivationService {
     final uri = Uri.parse("$host/api/deactivated-users/")
         .replace(queryParameters: queryParams);
 
-    final response = await http.get(uri);
+    final response = await http.get(uri, headers: authHeaders());
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     } else {
@@ -65,7 +68,7 @@ class DeletedAccountsService {
     final uri = Uri.parse("$host/api/deleted-accounts/")
         .replace(queryParameters: queryParams);
 
-    final response = await http.get(uri);
+    final response = await http.get(uri, headers: authHeaders());
     if (response.statusCode == 200) {
       return jsonDecode(response.body);
     } else {
@@ -80,7 +83,8 @@ class NotificationAdminService {
   // ── Dropdown data ──────────────────────────────────────────────────────────
 
   static Future<List<dynamic>> fetchDesCategories() async {
-    final res = await http.get(Uri.parse("$host/api/notif/des-categories/"));
+    final res = await http.get(Uri.parse("$host/api/notif/des-categories/"),
+        headers: authHeaders());
     if (res.statusCode == 200) {
       return (jsonDecode(res.body)['categories'] as List?) ?? [];
     }
@@ -90,7 +94,7 @@ class NotificationAdminService {
   static Future<List<dynamic>> fetchDesSubCategories(int desCatId) async {
     final uri = Uri.parse("$host/api/notif/des-sub-categories/")
         .replace(queryParameters: {'des_cat_id': desCatId.toString()});
-    final res = await http.get(uri);
+    final res = await http.get(uri, headers: authHeaders());
     if (res.statusCode == 200) {
       return (jsonDecode(res.body)['sub_categories'] as List?) ?? [];
     }
@@ -98,7 +102,8 @@ class NotificationAdminService {
   }
 
   static Future<List<dynamic>> fetchUserCategories() async {
-    final res = await http.get(Uri.parse("$host/api/notif/user-categories/"));
+    final res = await http.get(Uri.parse("$host/api/notif/user-categories/"),
+        headers: authHeaders());
     if (res.statusCode == 200) {
       return (jsonDecode(res.body)['categories'] as List?) ?? [];
     }
@@ -108,7 +113,8 @@ class NotificationAdminService {
   // ── Notification Rules ─────────────────────────────────────────────────────
 
   static Future<List<dynamic>> fetchRules() async {
-    final res = await http.get(Uri.parse("$host/api/notification-rules/"));
+    final res = await http.get(Uri.parse("$host/api/notification-rules/"),
+        headers: authHeaders());
     if (res.statusCode == 200) {
       return (jsonDecode(res.body)['rules'] as List?) ?? [];
     }
@@ -123,7 +129,7 @@ class NotificationAdminService {
   }) async {
     final res = await http.post(
       Uri.parse("$host/api/notification-rules/create/"),
-      headers: {'Content-Type': 'application/json'},
+      headers: authHeaders(),
       body: jsonEncode({
         'rule_name':      ruleName,
         'des_cat_id':     desCatId,
@@ -137,7 +143,7 @@ class NotificationAdminService {
   static Future<bool> toggleRule(int ruleId, bool isActive) async {
     final res = await http.put(
       Uri.parse("$host/api/notification-rules/$ruleId/update/"),
-      headers: {'Content-Type': 'application/json'},
+      headers: authHeaders(),
       body: jsonEncode({'is_active': isActive}),
     );
     return res.statusCode == 200;
@@ -146,6 +152,7 @@ class NotificationAdminService {
   static Future<bool> deleteRule(int ruleId) async {
     final res = await http.delete(
       Uri.parse("$host/api/notification-rules/$ruleId/delete/"),
+      headers: authHeaders(),
     );
     return res.statusCode == 200;
   }
@@ -153,7 +160,8 @@ class NotificationAdminService {
   // ── Broadcasts ─────────────────────────────────────────────────────────────
 
   static Future<List<dynamic>> fetchBroadcasts() async {
-    final res = await http.get(Uri.parse("$host/api/broadcasts/"));
+    final res = await http.get(Uri.parse("$host/api/broadcasts/"),
+        headers: authHeaders());
     if (res.statusCode == 200) {
       return (jsonDecode(res.body)['broadcasts'] as List?) ?? [];
     }
@@ -168,7 +176,7 @@ class NotificationAdminService {
     // Step 1: create
     final createRes = await http.post(
       Uri.parse("$host/api/broadcasts/create/"),
-      headers: {'Content-Type': 'application/json'},
+      headers: authHeaders(),
       body: jsonEncode({
         'title':          title,
         'body':           body,
@@ -184,7 +192,7 @@ class NotificationAdminService {
     // Step 2: send
     final sendRes = await http.post(
       Uri.parse("$host/api/broadcasts/$broadcastId/send/"),
-      headers: {'Content-Type': 'application/json'},
+      headers: authHeaders(),
     );
     final sendData = jsonDecode(sendRes.body) as Map<String, dynamic>;
     return {'broadcast_id': broadcastId, ...sendData};
@@ -195,7 +203,7 @@ class NotificationAdminService {
   static Future<List<dynamic>> fetchLogs({int page = 1}) async {
     final uri = Uri.parse("$host/api/notification-logs/")
         .replace(queryParameters: {'page': page.toString()});
-    final res = await http.get(uri);
+    final res = await http.get(uri, headers: authHeaders());
     if (res.statusCode == 200) {
       return (jsonDecode(res.body)['logs'] as List?) ?? [];
     }

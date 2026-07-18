@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_web_dashboard/config.dart';
 import 'package:flutter_web_dashboard/constants/style.dart';
+import 'package:flutter_web_dashboard/service_api/auth_headers.dart';
 
 class TermsPage extends StatefulWidget {
   const TermsPage({super.key});
@@ -29,7 +30,8 @@ class _TermsPageState extends State<TermsPage> {
 
   Future<void> fetchTerms() async {
     try {
-      final response = await http.get(Uri.parse('$host/api/term-policy/'));
+      final response = await http.get(Uri.parse('$host/api/term-policy/'),
+          headers: authHeaders());
       if (response.statusCode == 200) {
         final decoded = utf8.decode(response.bodyBytes);
         final data = json.decode(decoded);
@@ -52,7 +54,7 @@ class _TermsPageState extends State<TermsPage> {
     try {
       final response = await http.post(
         Uri.parse('$host/api/term-policy/'),
-        headers: {"Content-Type": "application/json"},
+        headers: authHeaders(),
         body: json.encode({"description": newDescription}),
       );
       if (response.statusCode == 200) {

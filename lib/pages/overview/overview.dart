@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_web_dashboard/constants/style.dart';
 import 'package:flutter_web_dashboard/pages/overview/widgets/bar_chart.dart';
@@ -14,19 +16,33 @@ class _OverviewPageState extends State<OverviewPage> {
   Map<String, dynamic>? _stats;
   bool _loading = true;
   String? _error;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _load();
+    // "Active now" only means something if the number keeps moving — refresh
+    // quietly in the background so an admin watching the page sees it live.
+    _refreshTimer = Timer.periodic(
+        const Duration(seconds: 30), (_) => _load(silent: true));
   }
 
-  Future<void> _load() async {
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) setState(() => _loading = true);
     try {
       final data = await DashboardService.fetchOverviewStats();
       if (mounted) setState(() { _stats = data; _loading = false; });
     } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
+      // A background refresh failing shouldn't blank out a page that's
+      // already showing good data — only surface the error on first load.
+      if (mounted && !silent) setState(() { _error = e.toString(); _loading = false; });
     }
   }
 
@@ -35,10 +51,7 @@ class _OverviewPageState extends State<OverviewPage> {
     return Scaffold(
       backgroundColor: background,
       body: RefreshIndicator(
-        onRefresh: () async {
-          setState(() => _loading = true);
-          await _load();
-        },
+        onRefresh: () => _load(),
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(24),
@@ -200,6 +213,7 @@ class _StatCardsGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cards = [
+      _CardData("Active Now",         stats['active_now'],          Icons.bolt_rounded,                  const Color(0xFF22C55E), live: true),
       _CardData("Total Users",        stats['total_users'],         Icons.people_rounded,               const Color(0xFF6366F1)),
       _CardData("Registrations",      stats['total_registrations'], Icons.person_add_rounded,            const Color(0xFF0EA5E9)),
       _CardData("Services",           stats['total_services'],      Icons.miscellaneous_services_rounded, const Color(0xFF10B981)),
@@ -233,7 +247,8 @@ class _CardData {
   final dynamic value;
   final IconData icon;
   final Color color;
-  const _CardData(this.label, this.value, this.icon, this.color);
+  final bool live;
+  const _CardData(this.label, this.value, this.icon, this.color, {this.live = false});
 }
 
 class _StatCard extends StatelessWidget {
@@ -271,14 +286,16 @@ class _StatCard extends StatelessWidget {
                 ),
                 child: Icon(data.icon, size: 20, color: data.color),
               ),
-              Container(
-                width: 4,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: data.color.withValues(alpha: 0.2),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
+              data.live
+                  ? _LivePulseDot(color: data.color)
+                  : Container(
+                      width: 4,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: data.color.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
             ],
           ),
           Column(
@@ -294,9 +311,27 @@ class _StatCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 2),
-              Text(data.label,
-                  style: const TextStyle(
-                      color: textSecondary, fontSize: 12, fontWeight: FontWeight.w500)),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(data.label,
+                      style: const TextStyle(
+                          color: textSecondary, fontSize: 12, fontWeight: FontWeight.w500)),
+                  if (data.live) ...[
+                    const SizedBox(width: 5),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: data.color.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text("LIVE",
+                          style: TextStyle(
+                              color: data.color, fontSize: 9, fontWeight: FontWeight.w800, letterSpacing: 0.3)),
+                    ),
+                  ],
+                ],
+              ),
             ],
           ),
         ],
@@ -612,6 +647,54 @@ class _DesCatCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Live pulse dot ────────────────────────────────────────────────────────────
+// Marks a stat as real-time (currently just "Active Now") — a soft breathing
+// glow, not a spinner, since this is ambient status rather than a loading state.
+
+class _LivePulseDot extends StatefulWidget {
+  final Color color;
+  const _LivePulseDot({required this.color});
+
+  @override
+  State<_LivePulseDot> createState() => _LivePulseDotState();
+}
+
+class _LivePulseDotState extends State<_LivePulseDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1100),
+  )..repeat(reverse: true);
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _ctrl,
+      builder: (_, __) => Container(
+        width: 10,
+        height: 10,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: widget.color,
+          boxShadow: [
+            BoxShadow(
+              color: widget.color.withValues(alpha: 0.55 * _ctrl.value),
+              blurRadius: 8,
+              spreadRadius: 2.5,
+            ),
+          ],
+        ),
       ),
     );
   }

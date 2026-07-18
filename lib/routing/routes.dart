@@ -55,13 +55,16 @@ class MenuItem {
   MenuItem(this.name, this.route);
 }
 
+// Every togglable page/section a superadmin can grant to an admin. Mirrors
+// members/permissions.py's PAGE_KEYS on the backend -- keep both in sync.
+// 'staff_admin' is deliberately NOT a page key: managing other admins is
+// always superuser-only, never toggle-able.
 List<MenuItem> sideMenuItemRoutes = [
   MenuItem(overviewPageDisplayName, overviewPageRoute),
   MenuItem(driversPageDisplayName, driversPageRoute),
   MenuItem(clientsPageDisplayName, clientsPageRoute),
   MenuItem(InsertPageDisplayName, InsertPageRoute),
   MenuItem(AppstatusPageDisplayName, AppstatusPageRoute),
-  // MenuItem(staffAdminPageDisplayName, staffAdminPageRoute),
   MenuItem(referralPageDisplayName, referralPageRoute),
   MenuItem(deactivationPageDisplayName, deactivationPageRoute),
   MenuItem(deletedAccountsPageDisplayName, deletedAccountsPageRoute),
@@ -74,3 +77,49 @@ List<MenuItem> sideMenuItemRoutes = [
   MenuItem(termsPageDisplayName, termsPageRoute),
   MenuItem(contactPageDisplayName, contactPageRoute),
 ];
+
+// route -> backend page-key, for filtering the menu/routes by an admin's
+// allowed_pages (from the login response). Superadmins bypass this entirely.
+const Map<String, String> pageKeyForRoute = {
+  overviewPageRoute: 'overview',
+  driversPageRoute: 'drivers',
+  clientsPageRoute: 'clients',
+  InsertPageRoute: 'insert',
+  AppstatusPageRoute: 'appstatus',
+  referralPageRoute: 'referral',
+  deactivationPageRoute: 'deactivation',
+  deletedAccountsPageRoute: 'deleted_accounts',
+  servicePageRoute: 'service',
+  shopPageRoute: 'shop',
+  subscriberPageRoute: 'subscribers',
+  reactionsPageRoute: 'reactions',
+  notificationsPageRoute: 'notifications',
+  termsPageRoute: 'terms',
+  contactPageRoute: 'contact',
+};
+
+// Every page key a superadmin can grant, in menu order, with its display
+// label -- drives the checkbox list on the Manage Admins page.
+const List<String> allPageKeys = [
+  'overview', 'drivers', 'clients', 'insert', 'appstatus',
+  'referral', 'deactivation', 'deleted_accounts', 'service', 'shop',
+  'subscribers', 'reactions', 'notifications', 'terms', 'contact',
+];
+
+const Map<String, String> pageKeyLabels = {
+  'overview': overviewPageDisplayName,
+  'drivers': driversPageDisplayName,
+  'clients': clientsPageDisplayName,
+  'insert': InsertPageDisplayName,
+  'appstatus': AppstatusPageDisplayName,
+  'referral': referralPageDisplayName,
+  'deactivation': deactivationPageDisplayName,
+  'deleted_accounts': deletedAccountsPageDisplayName,
+  'service': servicePageDisplayName,
+  'shop': shopPageDisplayName,
+  'subscribers': subscriberPageDisplayName,
+  'reactions': reactionsPageDisplayName,
+  'notifications': notificationsPageDisplayName,
+  'terms': termsPageDisplayName,
+  'contact': contactPageDisplayName,
+};

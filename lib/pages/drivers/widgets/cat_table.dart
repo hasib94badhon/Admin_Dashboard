@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_web_dashboard/config.dart';
 import 'package:flutter_web_dashboard/constants/style.dart';
+import 'package:flutter_web_dashboard/service_api/auth_headers.dart';
 
 class CatTable extends StatefulWidget {
   const CatTable({Key? key}) : super(key: key);
@@ -26,8 +27,9 @@ class _CatTableState extends State<CatTable> {
   ];
 
   Future<List<dynamic>> fetchData() async {
-    final response = await http
-        .get(Uri.parse('$host/api/cat?search=$searchQuery&sort=$sortBy'));
+    final response = await http.get(
+        Uri.parse('$host/api/cat?search=$searchQuery&sort=$sortBy'),
+        headers: authHeaders());
     if (response.statusCode == 200) {
       final body = response.body;
       if (body.isEmpty) return [];
@@ -40,7 +42,7 @@ class _CatTableState extends State<CatTable> {
   Future<void> toggleStatus(int categoryId) async {
     final url = Uri.parse('$host/api/toggle-status/$categoryId/');
     try {
-      final response = await http.post(url);
+      final response = await http.post(url, headers: authHeaders());
       if (response.statusCode == 200) {
         setState(() {});
       }

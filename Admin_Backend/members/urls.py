@@ -21,6 +21,15 @@ urlpatterns = [
     path('api/get-users/', get_users, name='get_users'),
     path('api/download-user/', download_user, name='download_user'),
     path('api/login-superuser/', login_superuser),
+
+    # Admin management (superadmin only)
+    path('api/admins/', list_admins, name='list-admins'),
+    path('api/admins/create/', create_admin, name='create-admin'),
+    path('api/admins/<int:pk>/permissions/', update_admin_permissions, name='update-admin-permissions'),
+    path('api/admins/<int:pk>/toggle-active/', toggle_admin_active, name='toggle-admin-active'),
+    path('api/admins/<int:pk>/delete/', delete_admin, name='delete-admin'),
+    path('api/admins/<int:pk>/reset-password/', reset_admin_password, name='reset-admin-password'),
+
     path('api/dashboard-stats/', dashboard_stats, name='dashboard_stats'),
     path('api/deactivated-users/', deactivated_users, name='deactivated_users'),
     path('api/deleted-accounts/', list_deleted_accounts, name='deleted-accounts'),

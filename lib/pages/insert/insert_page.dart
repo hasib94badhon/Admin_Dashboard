@@ -6,6 +6,7 @@ import 'dart:typed_data';
 import 'package:universal_html/html.dart' as html;
 import 'package:flutter_web_dashboard/config.dart';
 import 'package:flutter_web_dashboard/constants/style.dart';
+import 'package:flutter_web_dashboard/service_api/auth_headers.dart';
 
 // ── Flask admin helpers ───────────────────────────────────────────────────────
 
@@ -65,7 +66,8 @@ class _InsertPageState extends State<InsertPage> {
     }
     setState(() => isUploading = true);
     final uri = Uri.parse("$host/api/upload-users/");
-    var request = http.MultipartRequest("POST", uri);
+    var request = http.MultipartRequest("POST", uri)
+      ..headers.addAll(authHeadersMultipart());
     request.files.add(http.MultipartFile.fromBytes(
         "file", selectedFile!.bytes!,
         filename: selectedFile!.name));
@@ -91,7 +93,8 @@ class _InsertPageState extends State<InsertPage> {
     }
     setState(() => isUploading = true);
     final uri = Uri.parse("$host/api/upload-hotline-numbers/");
-    var request = http.MultipartRequest("POST", uri);
+    var request = http.MultipartRequest("POST", uri)
+      ..headers.addAll(authHeadersMultipart());
     request.files.add(http.MultipartFile.fromBytes(
         "file", selectedFile!.bytes!,
         filename: selectedFile!.name));
@@ -117,7 +120,8 @@ class _InsertPageState extends State<InsertPage> {
     }
     setState(() => isUploading = true);
     final uri = Uri.parse("$host/api/upload-apps/");
-    var request = http.MultipartRequest("POST", uri);
+    var request = http.MultipartRequest("POST", uri)
+      ..headers.addAll(authHeadersMultipart());
     request.files.add(http.MultipartFile.fromBytes(
         "file", selectedFile!.bytes!,
         filename: selectedFile!.name));
@@ -161,6 +165,7 @@ class _InsertPageState extends State<InsertPage> {
     bool isShop = selectedtype == "shop";
     final uri = Uri.parse('$host/api/insert-cat/');
     var request = http.MultipartRequest('POST', uri)
+      ..headers.addAll(authHeadersMultipart())
       ..fields['cat_name'] = catNameController.text
       ..fields['yes_service'] = isService.toString()
       ..fields['yes_shop'] = isShop.toString()
@@ -196,7 +201,7 @@ class _InsertPageState extends State<InsertPage> {
     try {
       final response = await http.post(
         Uri.parse("$host/api/insert-topic/"),
-        headers: {"Content-Type": "application/json"},
+        headers: authHeaders(),
         body: json.encode({"des_cat_name": name}),
       );
       if (response.statusCode == 201) {
@@ -221,7 +226,8 @@ class _InsertPageState extends State<InsertPage> {
     }
     setState(() => isUploading = true);
     final uri = Uri.parse("$host/api/upload-fb/");
-    var request = http.MultipartRequest("POST", uri);
+    var request = http.MultipartRequest("POST", uri)
+      ..headers.addAll(authHeadersMultipart());
     request.files.add(http.MultipartFile.fromBytes(
         "file", selectedFile!.bytes!,
         filename: selectedFile!.name));
@@ -640,6 +646,16 @@ class _SubCatManager extends StatefulWidget {
   State<_SubCatManager> createState() => _SubCatManagerState();
 }
 
+// The backend still stores name_bn/name_en as two columns (create/update
+// always write the same value into both — see _create()), so either one
+// may be the populated one for older rows. Prefer name_bn, fall back to
+// name_en, so the panel only ever shows a single name.
+String _subCatName(Map<String, dynamic> s) {
+  final bn = (s['name_bn'] as String?) ?? '';
+  if (bn.isNotEmpty) return bn;
+  return (s['name_en'] as String?) ?? '';
+}
+
 class _SubCatManagerState extends State<_SubCatManager> {
   List<Map<String, dynamic>> _categories = [];
   List<Map<String, dynamic>> _subCats = [];
@@ -650,8 +666,7 @@ class _SubCatManagerState extends State<_SubCatManager> {
 
   // Add form
   int? _formCatId;
-  final _nameBnCtrl = TextEditingController();
-  final _nameEnCtrl = TextEditingController();
+  final _nameCtrl = TextEditingController();
   final _emojiCtrl = TextEditingController();
   final _sortCtrl = TextEditingController(text: '0');
 
@@ -663,8 +678,7 @@ class _SubCatManagerState extends State<_SubCatManager> {
 
   @override
   void dispose() {
-    _nameBnCtrl.dispose();
-    _nameEnCtrl.dispose();
+    _nameCtrl.dispose();
     _emojiCtrl.dispose();
     _sortCtrl.dispose();
     super.dispose();
@@ -673,7 +687,7 @@ class _SubCatManagerState extends State<_SubCatManager> {
   Future<void> _fetchCategories() async {
     setState(() => _loadingCats = true);
     try {
-      final res = await http.get(Uri.parse('$host/api/des-categories/'));
+      final res = await http.get(Uri.parse('$host/api/des-categories/'), headers: authHeaders());
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
         setState(() => _categories = List<Map<String, dynamic>>.from(data['categories']));
@@ -689,7 +703,8 @@ class _SubCatManagerState extends State<_SubCatManager> {
     });
     try {
       final res = await http.get(
-          Uri.parse('$host/api/des-sub-categories/?des_cat_id=$catId'));
+          Uri.parse('$host/api/des-sub-categories/?des_cat_id=$catId'),
+          headers: authHeaders());
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
         setState(() =>
@@ -700,19 +715,23 @@ class _SubCatManagerState extends State<_SubCatManager> {
   }
 
   Future<void> _create() async {
-    if (_formCatId == null || _nameBnCtrl.text.trim().isEmpty) {
-      _snack('Category and Bengali name are required.');
+    if (_formCatId == null || _nameCtrl.text.trim().isEmpty) {
+      _snack('Category and name are required.');
       return;
     }
     setState(() => _isSaving = true);
     try {
+      // Backend still stores name_bn/name_en as two columns, but the app
+      // only ever displays one — so both are populated with the same
+      // admin-entered value rather than asking for two languages.
+      final name = _nameCtrl.text.trim();
       final res = await http.post(
         Uri.parse('$host/api/des-sub-categories/create/'),
-        headers: {'Content-Type': 'application/json'},
+        headers: authHeaders(),
         body: json.encode({
           'des_cat_id': _formCatId,
-          'name_bn': _nameBnCtrl.text.trim(),
-          'name_en': _nameEnCtrl.text.trim(),
+          'name_bn': name,
+          'name_en': name,
           'emoji': _emojiCtrl.text.trim(),
           'sort_order': int.tryParse(_sortCtrl.text) ?? 0,
         }),
@@ -720,8 +739,7 @@ class _SubCatManagerState extends State<_SubCatManager> {
       final data = json.decode(res.body);
       if (res.statusCode == 201) {
         _snack('Sub-category created!', success: true);
-        _nameBnCtrl.clear();
-        _nameEnCtrl.clear();
+        _nameCtrl.clear();
         _emojiCtrl.clear();
         _sortCtrl.text = '0';
         if (_filterCatId == _formCatId) _fetchSubCats(_formCatId!);
@@ -751,7 +769,8 @@ class _SubCatManagerState extends State<_SubCatManager> {
     );
     if (confirmed != true) return;
     try {
-      final res = await http.delete(Uri.parse('$host/api/des-sub-categories/$id/delete/'));
+      final res = await http.delete(Uri.parse('$host/api/des-sub-categories/$id/delete/'),
+          headers: authHeaders());
       if (res.statusCode == 200) {
         _snack('Deleted.', success: true);
         if (_filterCatId != null) _fetchSubCats(_filterCatId!);
@@ -764,8 +783,7 @@ class _SubCatManagerState extends State<_SubCatManager> {
   }
 
   Future<void> _showEditDialog(Map<String, dynamic> sub) async {
-    final bnCtrl = TextEditingController(text: sub['name_bn'] ?? '');
-    final enCtrl = TextEditingController(text: sub['name_en'] ?? '');
+    final nameCtrl = TextEditingController(text: _subCatName(sub));
     final emCtrl = TextEditingController(text: sub['emoji'] ?? '');
     final soCtrl = TextEditingController(text: '${sub['sort_order'] ?? 0}');
     bool saving = false;
@@ -780,9 +798,7 @@ class _SubCatManagerState extends State<_SubCatManager> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                _dlgField(bnCtrl, 'Bengali Name *'),
-                const SizedBox(height: 12),
-                _dlgField(enCtrl, 'English Name'),
+                _dlgField(nameCtrl, 'Name *'),
                 const SizedBox(height: 12),
                 _dlgField(emCtrl, 'Emoji'),
                 const SizedBox(height: 12),
@@ -801,12 +817,15 @@ class _SubCatManagerState extends State<_SubCatManager> {
                   : () async {
                       setDlg(() => saving = true);
                       try {
+                        // Same value goes into both name_bn/name_en — see
+                        // _create() for why.
+                        final name = nameCtrl.text.trim();
                         final res = await http.put(
                           Uri.parse('$host/api/des-sub-categories/${sub['des_sub_cat_id']}/update/'),
-                          headers: {'Content-Type': 'application/json'},
+                          headers: authHeaders(),
                           body: json.encode({
-                            'name_bn': bnCtrl.text.trim(),
-                            'name_en': enCtrl.text.trim(),
+                            'name_bn': name,
+                            'name_en': name,
                             'emoji': emCtrl.text.trim(),
                             'sort_order': int.tryParse(soCtrl.text) ?? 0,
                           }),
@@ -835,8 +854,7 @@ class _SubCatManagerState extends State<_SubCatManager> {
         );
       }),
     );
-    bnCtrl.dispose();
-    enCtrl.dispose();
+    nameCtrl.dispose();
     emCtrl.dispose();
     soCtrl.dispose();
   }
@@ -844,7 +862,8 @@ class _SubCatManagerState extends State<_SubCatManager> {
   Future<List<Map<String, dynamic>>> _fetchSuggestionsFor(int subCatId) async {
     try {
       final res = await http.get(
-          Uri.parse('$host/api/des-cat-suggestions/?des_sub_cat_id=$subCatId'));
+          Uri.parse('$host/api/des-cat-suggestions/?des_sub_cat_id=$subCatId'),
+          headers: authHeaders());
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
         return List<Map<String, dynamic>>.from(data['suggestions']);
@@ -875,7 +894,7 @@ class _SubCatManagerState extends State<_SubCatManager> {
           try {
             final res = await http.post(
               Uri.parse('$host/api/des-cat-suggestions/create/'),
-              headers: {'Content-Type': 'application/json'},
+              headers: authHeaders(),
               body: json.encode({
                 'des_sub_cat_id': subCatId,
                 'suggestion_text': text,
@@ -896,8 +915,9 @@ class _SubCatManagerState extends State<_SubCatManager> {
 
         Future<void> removeOne(int id) async {
           try {
-            final res = await http
-                .delete(Uri.parse('$host/api/des-cat-suggestions/$id/delete/'));
+            final res = await http.delete(
+                Uri.parse('$host/api/des-cat-suggestions/$id/delete/'),
+                headers: authHeaders());
             if (res.statusCode == 200) {
               await reload();
             } else {
@@ -909,7 +929,7 @@ class _SubCatManagerState extends State<_SubCatManager> {
         }
 
         return AlertDialog(
-          title: Text('Suggestions — ${sub['name_bn'] ?? ''}'),
+          title: Text('Suggestions — ${_subCatName(sub)}'),
           content: SizedBox(
             width: 420,
             child: Column(
@@ -1052,29 +1072,16 @@ class _SubCatManagerState extends State<_SubCatManager> {
                     ),
                     const SizedBox(height: 16),
 
-                    // Bengali name
-                    const Text('Bengali Name *',
+                    // Name (Bengali or English — admin's choice, one field only)
+                    const Text('Name *',
                         style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textSecondary)),
                     const SizedBox(height: 8),
-                    _inputField(_nameBnCtrl, 'যেমন: সম্পত্তির বিজ্ঞাপন'),
+                    _inputField(_nameCtrl, 'যেমন: সম্পত্তির বিজ্ঞাপন / Property Ads'),
                     const SizedBox(height: 16),
 
-                    // English name + emoji in a row
+                    // Emoji + sort in a row
                     Row(
                       children: [
-                        Expanded(
-                          flex: 3,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('English Name',
-                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: textSecondary)),
-                              const SizedBox(height: 8),
-                              _inputField(_nameEnCtrl, 'e.g. Property Ads'),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
                         Expanded(
                           flex: 1,
                           child: Column(
@@ -1199,8 +1206,7 @@ class _SubCatManagerState extends State<_SubCatManager> {
                         child: const Row(
                           children: [
                             SizedBox(width: 40, child: Text('ID', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: textSecondary))),
-                            Expanded(flex: 3, child: Text('Bengali Name', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: textSecondary))),
-                            Expanded(flex: 2, child: Text('English Name', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: textSecondary))),
+                            Expanded(flex: 5, child: Text('Name', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: textSecondary))),
                             SizedBox(width: 40, child: Text('Emoji', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: textSecondary))),
                             SizedBox(width: 40, child: Text('Sort', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: textSecondary))),
                             SizedBox(width: 108, child: Text('Actions', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: textSecondary))),
@@ -1220,8 +1226,7 @@ class _SubCatManagerState extends State<_SubCatManager> {
                           child: Row(
                             children: [
                               SizedBox(width: 40, child: Text('${s['des_sub_cat_id']}', style: const TextStyle(fontSize: 12, color: textMuted))),
-                              Expanded(flex: 3, child: Text(s['name_bn'] ?? '', style: const TextStyle(fontSize: 13, color: textPrimary))),
-                              Expanded(flex: 2, child: Text(s['name_en'] ?? '', style: const TextStyle(fontSize: 12, color: textSecondary))),
+                              Expanded(flex: 5, child: Text(_subCatName(s), style: const TextStyle(fontSize: 13, color: textPrimary))),
                               SizedBox(width: 40, child: Text(s['emoji'] ?? '', style: const TextStyle(fontSize: 16))),
                               SizedBox(width: 40, child: Text('${s['sort_order']}', style: const TextStyle(fontSize: 12, color: textMuted))),
                               SizedBox(

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_web_dashboard/pages/overview/widgets/info_card.dart';
 import 'package:http/http.dart' as http;
 import "package:flutter_web_dashboard/config.dart";
+import "package:flutter_web_dashboard/service_api/auth_headers.dart";
 
 class OverviewCardsLargeScreen extends StatefulWidget {
   const OverviewCardsLargeScreen({super.key});
@@ -23,6 +24,7 @@ class _OverviewCardsLargeScreenState extends State<OverviewCardsLargeScreen> {
     try {
       final response = await http.get(
         Uri.parse('$host/api/count'),
+        headers: authHeaders(),
       );
       if (response.statusCode == 200) {
         final data = json.decode(response.body);

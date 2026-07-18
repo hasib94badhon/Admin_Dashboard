@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_web_dashboard/config.dart';
 import 'package:flutter_web_dashboard/constants/style.dart';
+import 'package:flutter_web_dashboard/service_api/auth_headers.dart';
 
 class AppStatusPage extends StatefulWidget {
   const AppStatusPage({super.key});
@@ -38,7 +39,7 @@ class _AppStatusPageState extends State<AppStatusPage> {
   Future<void> _fetchData() async {
     setState(() { _loading = true; _error = null; });
     try {
-      final res = await http.get(Uri.parse('$host/api/app-status/'))
+      final res = await http.get(Uri.parse('$host/api/app-status/'), headers: authHeaders())
           .timeout(const Duration(seconds: 10));
       if (res.statusCode == 200) {
         setState(() { _data = json.decode(res.body); _loading = false; });
@@ -152,7 +153,7 @@ class _EndpointStatus {
   Future<void> ping() async {
     final sw = Stopwatch()..start();
     try {
-      final res = await http.get(Uri.parse('$host$path'))
+      final res = await http.get(Uri.parse('$host$path'), headers: authHeaders())
           .timeout(const Duration(seconds: 8));
       sw.stop();
       isUp = res.statusCode < 500;

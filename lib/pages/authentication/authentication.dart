@@ -42,9 +42,12 @@ class _AuthenticationPageState extends State<AuthenticationPage> {
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
       if (data['success'] == true) {
-        final username = data['user']['username'];
+        final user = data['user'];
         storage.write('isLoggedIn', true);
-        storage.write('admin_username', username);
+        storage.write('admin_username', user['username']);
+        storage.write('auth_token', data['token']);
+        storage.write('is_superadmin', user['is_superuser'] == true);
+        storage.write('allowed_pages', jsonEncode(user['allowed_pages'] ?? []));
         Get.snackbar("Success", "Login successful",
             snackPosition: SnackPosition.TOP,
             backgroundColor: successColor,
