@@ -287,7 +287,7 @@ def insert_cat(request):
 
         try:
             with FTP(config('FTP_HOST'), timeout=30) as ftp:
-                ftp.login(user=config('FTP_USER'), passwd=config('FTP_PASSWORD'))
+                ftp.login(user=config('FTP_USER'), passwd=config('FTP_PASS'))
                 ftp.cwd(ftp_directory)
                 ftp.storbinary(f'STOR {file_name}', cat_logo.file)
         except Exception as e:
