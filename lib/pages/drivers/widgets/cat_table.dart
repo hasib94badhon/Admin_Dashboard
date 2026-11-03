@@ -343,6 +343,14 @@ class _CatTableState extends State<CatTable> {
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        '#$catId',
+                                        style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w500,
+                                            color: textSecondary),
+                                      ),
                                     ])),
                                     // Times used
                                     DataCell(Text(
