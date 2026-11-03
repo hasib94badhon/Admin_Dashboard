@@ -293,8 +293,13 @@ def insert_cat(request):
         except Exception as e:
             return JsonResponse({"error": f"Logo upload to FTP failed: {e}"}, status=502)
 
-        cat = Cat(cat_name=cat_name, cat_logo=file_name, yes_service=is_service, yes_shop=is_shop)
-        cat.save()
+        # user_count/cat_used are NOT NULL in the DB, but the model allows None.
+        cat = Cat(cat_name=cat_name, cat_logo=file_name, yes_service=is_service, yes_shop=is_shop,
+                  user_count=0, cat_used=0)
+        try:
+            cat.save()
+        except Exception as e:
+            return JsonResponse({"error": f"Logo uploaded, but saving the category failed: {e}"}, status=500)
         return JsonResponse({"success": "Cat inserted successfully!", "cat_id": cat.cat_id})
     else:
         return JsonResponse({"error": "Invalid request method"}, status=405)
