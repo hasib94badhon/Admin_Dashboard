@@ -26,9 +26,15 @@ class _CatTableState extends State<CatTable> {
     ('yes_shop', 'Shop'),
   ];
 
+  // Held in state so unrelated rebuilds don't refetch (and reset scroll).
+  late Future<List<dynamic>> _future = fetchData();
+
+  void _reload() => setState(() => _future = fetchData());
+
   Future<List<dynamic>> fetchData() async {
     final response = await http.get(
-        Uri.parse('$host/api/cat?search=$searchQuery&sort=$sortBy'),
+        Uri.parse(
+            '$host/api/cat?search=${Uri.encodeQueryComponent(searchQuery)}&sort=$sortBy'),
         headers: authHeaders());
     if (response.statusCode == 200) {
       final body = response.body;
@@ -39,17 +45,22 @@ class _CatTableState extends State<CatTable> {
     }
   }
 
-  Future<void> toggleStatus(int categoryId) async {
-    final url = Uri.parse('$host/api/toggle-status/$categoryId/');
+  // Updates the row in place instead of refetching, so the scroll stays put.
+  Future<void> toggleStatus(Map cat) async {
+    final url = Uri.parse('$host/api/toggle-status/${cat['cat_id']}/');
     try {
       final response = await http.post(url, headers: authHeaders());
       if (response.statusCode == 200) {
-        setState(() {});
+        final data = json.decode(response.body);
+        setState(() => cat['status'] = data['status']);
       }
     } catch (_) {}
   }
 
-  Future<void> editCatUsed(int catId, String catName, int current) async {
+  Future<void> editCatUsed(Map cat) async {
+    final int catId = cat['cat_id'];
+    final String catName = cat['cat_name'] ?? '';
+    final int current = cat['cat_used'] ?? 0;
     final ctrl = TextEditingController(text: '$current');
     final newValue = await showDialog<int>(
       context: context,
@@ -104,7 +115,7 @@ class _CatTableState extends State<CatTable> {
       backgroundColor: ok ? successColor : errorColor,
       behavior: SnackBarBehavior.floating,
     ));
-    if (ok) setState(() {});
+    if (ok) setState(() => cat['cat_used'] = newValue);
   }
 
   @override
@@ -131,6 +142,16 @@ class _CatTableState extends State<CatTable> {
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
                   color: textPrimary,
+                ),
+              ),
+              const Spacer(),
+              OutlinedButton.icon(
+                onPressed: _reload,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('Refresh'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: accentColor,
+                  side: const BorderSide(color: borderColor),
                 ),
               ),
             ],
@@ -171,7 +192,8 @@ class _CatTableState extends State<CatTable> {
                                 color: textMuted, size: 18),
                             onPressed: () {
                               _searchController.clear();
-                              setState(() => searchQuery = "");
+                              searchQuery = "";
+                              _reload();
                             },
                           )
                         : null,
@@ -193,8 +215,14 @@ class _CatTableState extends State<CatTable> {
                           const BorderSide(color: accentColor, width: 1.5),
                     ),
                   ),
-                  onChanged: (v) => setState(() => searchQuery = v),
-                  onSubmitted: (v) => setState(() => searchQuery = v),
+                  onChanged: (v) {
+                    searchQuery = v;
+                    _reload();
+                  },
+                  onSubmitted: (v) {
+                    searchQuery = v;
+                    _reload();
+                  },
                 ),
               ),
               const SizedBox(width: 12),
@@ -221,7 +249,10 @@ class _CatTableState extends State<CatTable> {
                       );
                     }).toList(),
                     onChanged: (v) {
-                      if (v != null) setState(() => sortBy = v);
+                      if (v != null) {
+                        sortBy = v;
+                        _reload();
+                      }
                     },
                   ),
                 ),
@@ -245,9 +276,11 @@ class _CatTableState extends State<CatTable> {
               ],
             ),
             child: FutureBuilder<List<dynamic>>(
-              future: fetchData(),
+              future: _future,
               builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
+                // Keep showing the current table while a refresh is in flight.
+                if (snapshot.connectionState == ConnectionState.waiting &&
+                    !snapshot.hasData) {
                   return const Center(
                       child: CircularProgressIndicator(color: accentColor));
                 }
@@ -264,7 +297,7 @@ class _CatTableState extends State<CatTable> {
                                 color: textSecondary, fontSize: 14)),
                         const SizedBox(height: 12),
                         TextButton.icon(
-                          onPressed: () => setState(() {}),
+                          onPressed: _reload,
                           icon: const Icon(Icons.refresh, size: 16),
                           label: const Text('Retry'),
                           style: TextButton.styleFrom(
@@ -435,8 +468,7 @@ class _CatTableState extends State<CatTable> {
                                               size: 14, color: textMuted),
                                         ],
                                       ),
-                                      onTap: () => editCatUsed(
-                                          catId, catName, catUsed),
+                                      onTap: () => editCatUsed(cat),
                                     ),
                                     // User count
                                     DataCell(Text(
@@ -449,8 +481,7 @@ class _CatTableState extends State<CatTable> {
                                     // Status toggle badge
                                     DataCell(
                                       GestureDetector(
-                                        onTap: () =>
-                                            toggleStatus(catId),
+                                        onTap: () => toggleStatus(cat),
                                         child: _StatusBadge(
                                             isActive: isActive),
                                       ),
