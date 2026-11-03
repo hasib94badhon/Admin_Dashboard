@@ -49,6 +49,64 @@ class _CatTableState extends State<CatTable> {
     } catch (_) {}
   }
 
+  Future<void> editCatUsed(int catId, String catName, int current) async {
+    final ctrl = TextEditingController(text: '$current');
+    final newValue = await showDialog<int>(
+      context: context,
+      builder: (dialogCtx) {
+        void submit() {
+          final v = int.tryParse(ctrl.text.trim());
+          if (v != null && v >= 0) Navigator.of(dialogCtx).pop(v);
+        }
+
+        return AlertDialog(
+          title: Text('Times Used — $catName'),
+          content: TextField(
+            controller: ctrl,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(
+              labelText: 'Times used',
+              border: OutlineInputBorder(),
+            ),
+            onSubmitted: (_) => submit(),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: submit,
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
+    );
+    ctrl.dispose();
+    if (newValue == null || newValue == current) return;
+
+    bool ok = false;
+    try {
+      final res = await http.post(
+        Uri.parse('$host/api/cat/$catId/set-used/'),
+        headers: authHeaders(),
+        body: json.encode({'cat_used': newValue}),
+      );
+      ok = res.statusCode == 200;
+    } catch (_) {}
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(ok
+          ? 'Times used for $catName set to $newValue'
+          : 'Failed to update times used'),
+      backgroundColor: ok ? successColor : errorColor,
+      behavior: SnackBarBehavior.floating,
+    ));
+    if (ok) setState(() {});
+  }
+
   @override
   void dispose() {
     _searchController.dispose();
@@ -102,7 +160,7 @@ class _CatTableState extends State<CatTable> {
                   controller: _searchController,
                   style: const TextStyle(fontSize: 14, color: textPrimary),
                   decoration: InputDecoration(
-                    hintText: 'Search categories...',
+                    hintText: 'Search by name or ID...',
                     hintStyle:
                         const TextStyle(color: textMuted, fontSize: 14),
                     prefixIcon:
@@ -278,6 +336,15 @@ class _CatTableState extends State<CatTable> {
                                 dividerThickness: 1,
                                 columns: const [
                                   DataColumn(
+                                    label: Text('ID',
+                                        style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                            color: textSecondary,
+                                            letterSpacing: 0.5)),
+                                    numeric: true,
+                                  ),
+                                  DataColumn(
                                     label: Text('Category',
                                         style: TextStyle(
                                             fontSize: 12,
@@ -327,6 +394,13 @@ class _CatTableState extends State<CatTable> {
                                       (cat['status'] ?? false) as bool;
 
                                   return DataRow(cells: [
+                                    // Category ID
+                                    DataCell(Text(
+                                      '$catId',
+                                      style: const TextStyle(
+                                          fontSize: 14,
+                                          color: textSecondary),
+                                    )),
                                     // Category name + logo
                                     DataCell(Row(children: [
                                       _CatAvatar(
@@ -343,23 +417,27 @@ class _CatTableState extends State<CatTable> {
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
-                                      const SizedBox(width: 8),
-                                      Text(
-                                        '#$catId',
-                                        style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w500,
-                                            color: textSecondary),
-                                      ),
                                     ])),
-                                    // Times used
-                                    DataCell(Text(
-                                      NumberFormatter.formatNumber(
-                                          catUsed),
-                                      style: const TextStyle(
-                                          fontSize: 14,
-                                          color: textPrimary),
-                                    )),
+                                    // Times used (click to edit)
+                                    DataCell(
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            NumberFormatter.formatNumber(
+                                                catUsed),
+                                            style: const TextStyle(
+                                                fontSize: 14,
+                                                color: textPrimary),
+                                          ),
+                                          const SizedBox(width: 6),
+                                          const Icon(Icons.edit_outlined,
+                                              size: 14, color: textMuted),
+                                        ],
+                                      ),
+                                      onTap: () => editCatUsed(
+                                          catId, catName, catUsed),
+                                    ),
                                     // User count
                                     DataCell(Text(
                                       NumberFormatter.formatNumber(

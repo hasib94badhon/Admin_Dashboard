@@ -44,6 +44,7 @@ urlpatterns = [
     path('api/toggle-subscriber/<int:sub_id>/', toggle_subscriber, name='toggle-subscriber'),
     path('api/subscription-settings/', SubscriptionSettingsAPIView.as_view(), name='subscription-settings'),
     path('api/cat/<int:pk>/set-fee/', set_cat_fee, name='set-cat-fee'),
+    path('api/cat/<int:pk>/set-used/', set_cat_used, name='set-cat-used'),
     path('api/overview-stats/', overview_stats, name='overview-stats'),
     path('api/app-status/', app_status, name='app-status'),
     path('api/insert-topic/', insert_des_cat, name='insert-topic'),

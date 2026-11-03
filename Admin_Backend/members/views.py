@@ -221,10 +221,13 @@ class CatAPIView(APIView):
         # Base queryset
         cat = Cat.objects.all()
 
-        # Search by cat_name
-        search = request.GET.get('search', None)
+        # Search by cat_name, or exact cat_id when the query is a number
+        search = (request.GET.get('search') or '').strip()
         if search:
-            cat = cat.filter(cat_name__icontains=search)
+            query = Q(cat_name__icontains=search)
+            if search.isdigit():
+                query |= Q(cat_id=int(search))
+            cat = cat.filter(query)
 
         # Sort logic
         sort_by = request.GET.get('sort', None)
@@ -726,6 +729,26 @@ def toggle_status(request, pk):
         "id": category.cat_id,
         "name": category.cat_name,
         "status": category.status
+    })
+
+
+@api_view(['POST'])
+@page_access('drivers')
+def set_cat_used(request, pk):
+    category = get_object_or_404(Cat, pk=pk)
+    try:
+        cat_used = int(request.data.get('cat_used'))
+    except (TypeError, ValueError):
+        return Response({"success": False, "message": "cat_used must be a number"}, status=400)
+    if cat_used < 0:
+        return Response({"success": False, "message": "cat_used cannot be negative"}, status=400)
+    category.cat_used = cat_used
+    category.save(update_fields=['cat_used'])
+    return Response({
+        "success": True,
+        "id": category.cat_id,
+        "name": category.cat_name,
+        "cat_used": category.cat_used,
     })
 
 
