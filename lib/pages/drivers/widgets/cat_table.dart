@@ -427,12 +427,25 @@ class _CatTableState extends State<CatTable> {
                                       (cat['status'] ?? false) as bool;
 
                                   return DataRow(cells: [
-                                    // Category ID
-                                    DataCell(Text(
-                                      '$catId',
-                                      style: const TextStyle(
-                                          fontSize: 14,
-                                          color: textSecondary),
+                                    // Service/Shop tag + category ID
+                                    DataCell(Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        if (_isOn(cat['yes_service']))
+                                          const _TypeTag(
+                                              label: 'Service',
+                                              color: accentColor),
+                                        if (_isOn(cat['yes_shop']))
+                                          const _TypeTag(
+                                              label: 'Shop',
+                                              color: warningColor),
+                                        Text(
+                                          '$catId',
+                                          style: const TextStyle(
+                                              fontSize: 14,
+                                              color: textSecondary),
+                                        ),
+                                      ],
                                     )),
                                     // Category name + logo
                                     DataCell(Row(children: [
@@ -555,6 +568,33 @@ class _CatAvatarState extends State<_CatAvatar> {
               color: accentColor,
               fontWeight: FontWeight.w700,
               fontSize: 14)),
+    );
+  }
+}
+
+// yes_service / yes_shop come back as 0/1 ints.
+bool _isOn(dynamic v) => v == true || v == 1 || v == '1';
+
+class _TypeTag extends StatelessWidget {
+  final String label;
+  final Color color;
+  const _TypeTag({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(right: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+            fontSize: 11, fontWeight: FontWeight.w600, color: color),
+      ),
     );
   }
 }
