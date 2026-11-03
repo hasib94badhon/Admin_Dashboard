@@ -13,6 +13,7 @@ from django.http import JsonResponse,HttpResponse
 from django.template.loader import render_to_string
 from django.views.decorators.csrf import csrf_exempt
 from ftplib import FTP
+from decouple import config
 from django.core.files.storage import FileSystemStorage
 from openpyxl import load_workbook
 from django.shortcuts import get_object_or_404
@@ -273,56 +274,28 @@ def insert_cat(request):
     if request.method == 'POST':
         cat_name = request.POST.get('cat_name')
         cat_logo = request.FILES.get('cat_logo')
-        is_service = str_to_bool(request.POST.get('yes_service'.lower(), 'false'))
-        is_shop = str_to_bool(request.POST.get('yes_shop'.lower(), 'false'))
-        
-       
-        if is_service == 'True' and is_shop == 'False':
-            is_service = 1
-            is_shop = 0
-        
-        if is_service == 'False' and is_shop == 'True':
-            is_service = 0
-            is_shop = 1
-        
-            
-        print(is_service)   
-        print(is_shop)
-        
+        is_service = 1 if str_to_bool(request.POST.get('yes_service', 'false')) else 0
+        is_shop = 1 if str_to_bool(request.POST.get('yes_shop', 'false')) else 0
 
         if not (cat_name and cat_logo):
-            return JsonResponse({"error": "cat_name,cat_logo,is_service,is_shop are required!"}, status=400)
+            return JsonResponse({"error": "Category name and logo are required."}, status=400)
 
-        # Save the photo to an FTP server
-        ftp_server = '89.117.27.223'
-        ftp_username = 'u790304855'
-        ftp_password = 'Abra!!@@12'
-        ftp_directory = '/domains/aarambd.com/public_html/cat logo'
-
+        # Logos live on the aarambd.com web host (where the app loads them
+        # from), uploaded over FTP. Credentials come from .env.
+        ftp_directory = config('FTP_CAT_LOGO_DIR', default='/domains/aarambd.com/public_html/cat logo')
         file_name = cat_logo.name
 
-        # Connect to FTP server
-        ftp = FTP(ftp_server,ftp_username,ftp_password)
-        
         try:
-            ftp.connect(ftp_server)
-            ftp.login(user=ftp_username, passwd=ftp_password)
-            ftp.cwd(ftp_directory)
-
-            # Upload the file
-            with cat_logo.file as file:
-                ftp.storbinary(f'STOR {file_name}', file)
-                print("Upload to the ftp successfully")
-            
-            # Save data to the database
-            cat = Cat(cat_name=cat_name, cat_logo=file_name,yes_service=is_service,yes_shop=is_shop)
-            cat.save()
-
-            ftp.quit()
-            return JsonResponse({"success": "Cat inserted successfully!"})
+            with FTP(config('FTP_HOST'), timeout=30) as ftp:
+                ftp.login(user=config('FTP_USER'), passwd=config('FTP_PASSWORD'))
+                ftp.cwd(ftp_directory)
+                ftp.storbinary(f'STOR {file_name}', cat_logo.file)
         except Exception as e:
-            ftp.quit()
-            return JsonResponse({"error": str(e)}, status=500)
+            return JsonResponse({"error": f"Logo upload to FTP failed: {e}"}, status=502)
+
+        cat = Cat(cat_name=cat_name, cat_logo=file_name, yes_service=is_service, yes_shop=is_shop)
+        cat.save()
+        return JsonResponse({"success": "Cat inserted successfully!", "cat_id": cat.cat_id})
     else:
         return JsonResponse({"error": "Invalid request method"}, status=405)
 

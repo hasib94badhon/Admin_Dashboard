@@ -184,7 +184,13 @@ class _InsertPageState extends State<InsertPage> {
           selectedtype = null;
         });
       } else {
-        _snack("Failed to create category!");
+        final body = await response.stream.bytesToString();
+        String? reason;
+        try {
+          reason = (json.decode(body) as Map)['error']?.toString();
+        } catch (_) {}
+        _snack(
+            "Failed to create category (${response.statusCode})${reason != null ? ': $reason' : ''}");
       }
     } catch (e) {
       _snack("Error occurred while inserting data!");
