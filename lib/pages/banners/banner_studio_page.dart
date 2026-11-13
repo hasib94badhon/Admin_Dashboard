@@ -272,17 +272,22 @@ class _BannerStudioPageState extends State<BannerStudioPage> {
 
   // ── Export ────────────────────────────────────────────────────────────────
 
+  /// Renders the card on screen to PNG bytes (2100 x 1200).
+  Future<Uint8List> _renderPng() async {
+    await GoogleFonts.pendingFonts();
+    await WidgetsBinding.instance.endOfFrame;
+    final boundary = _cardKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
+    final image = await boundary.toImage(pixelRatio: _exportRatio);
+    final data = await image.toByteData(format: ui.ImageByteFormat.png);
+    if (data == null) throw Exception('Could not encode PNG');
+    return data.buffer.asUint8List();
+  }
+
   Future<void> _downloadPng() async {
     if (_selected == null || _exporting) return;
     setState(() => _exporting = true);
     try {
-      await GoogleFonts.pendingFonts();
-      await WidgetsBinding.instance.endOfFrame;
-      final boundary = _cardKey.currentContext!.findRenderObject() as RenderRepaintBoundary;
-      final image = await boundary.toImage(pixelRatio: _exportRatio);
-      final data = await image.toByteData(format: ui.ImageByteFormat.png);
-      if (data == null) throw Exception('Could not encode PNG');
-      final bytes = data.buffer.asUint8List();
+      final bytes = await _renderPng();
 
       final slug = _nameCtrl.text
           .toLowerCase()
@@ -301,6 +306,57 @@ class _BannerStudioPageState extends State<BannerStudioPage> {
       _snack('Export failed: $e');
     } finally {
       if (mounted) setState(() => _exporting = false);
+    }
+  }
+
+  String _defaultCaption() {
+    final lines = <String>[
+      _nameCtrl.text.trim(),
+      [_catCtrl.text.trim(), _locCtrl.text.trim()].where((e) => e.isNotEmpty).join(' · '),
+      if (_phoneCtrl.text.trim().isNotEmpty) 'Call: ${_phoneCtrl.text.trim()}',
+      'Find more trusted ${_type == 'shop' ? 'shops' : 'services'} near you on AaramBD.',
+    ];
+    return lines.where((e) => e.isNotEmpty).join('\n');
+  }
+
+  Future<void> _shareAsPost() async {
+    if (_selected == null || _exporting) return;
+    setState(() => _exporting = true);
+    late Uint8List png;
+    late Map<String, dynamic> topicsBody;
+    try {
+      final results = await Future.wait([
+        _renderPng(),
+        http.get(Uri.parse('$host/api/banners/topics/'), headers: authHeaders()),
+      ]);
+      png = results[0] as Uint8List;
+      final res = results[1] as http.Response;
+      if (res.statusCode != 200) throw Exception('Could not load topics (${res.statusCode})');
+      topicsBody = json.decode(utf8.decode(res.bodyBytes)) as Map<String, dynamic>;
+    } catch (e) {
+      _snack('$e');
+      if (mounted) setState(() => _exporting = false);
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _exporting = false);
+
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _SharePostDialog(
+        png: png,
+        topics: List<Map<String, dynamic>>.from(topicsBody['topics'] as List? ?? const []),
+        account: (topicsBody['account'] as Map?)?.cast<String, dynamic>(),
+        accountError: topicsBody['account_error'] as String?,
+        initialCaption: _defaultCaption(),
+        listingType: _type,
+        listingId: '${_selected!['id']}',
+      ),
+    );
+    if (result != null && result['success'] == true) {
+      _snack('Posted as ${(result['posted_as'] as Map?)?['name'] ?? 'AaramBD'} — post #${result['des_id']}',
+          success: true);
     }
   }
 
@@ -589,6 +645,16 @@ class _BannerStudioPageState extends State<BannerStudioPage> {
               Text('${(_cardW * _exportRatio).toInt()} × ${(_cardH * _exportRatio).toInt()} px PNG',
                   style: const TextStyle(fontSize: 12, color: textSecondary)),
               const Spacer(),
+              OutlinedButton.icon(
+                onPressed: _exporting || _imagesLoading ? null : _shareAsPost,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: accentColor,
+                  side: const BorderSide(color: accentColor),
+                ),
+                icon: const Icon(Icons.send_rounded, size: 18),
+                label: const Text('Share as post'),
+              ),
+              const SizedBox(width: 10),
               FilledButton.icon(
                 onPressed: _exporting || _imagesLoading ? null : _downloadPng,
                 style: FilledButton.styleFrom(backgroundColor: accentColor),
@@ -626,6 +692,222 @@ class _BannerStudioPageState extends State<BannerStudioPage> {
           Text(label, style: const TextStyle(fontSize: 13, color: textPrimary)),
         ]),
       );
+}
+
+// ── Share as post dialog ────────────────────────────────────────────────────
+
+class _SharePostDialog extends StatefulWidget {
+  final Uint8List png;
+  final List<Map<String, dynamic>> topics;
+  final Map<String, dynamic>? account;
+  final String? accountError;
+  final String initialCaption;
+  final String listingType;
+  final String listingId;
+
+  const _SharePostDialog({
+    required this.png,
+    required this.topics,
+    required this.account,
+    required this.accountError,
+    required this.initialCaption,
+    required this.listingType,
+    required this.listingId,
+  });
+
+  @override
+  State<_SharePostDialog> createState() => _SharePostDialogState();
+}
+
+class _SharePostDialogState extends State<_SharePostDialog> {
+  late final TextEditingController _caption = TextEditingController(text: widget.initialCaption);
+  int? _catId;
+  int? _subId;
+  bool _posting = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    // Pre-select "Billboard of Ads" if it exists — the natural home for promotions.
+    for (final t in widget.topics) {
+      if ('${t['des_cat_name']}'.toLowerCase().contains('billboard')) {
+        _catId = (t['des_cat_id'] as num).toInt();
+        break;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _caption.dispose();
+    super.dispose();
+  }
+
+  List<Map<String, dynamic>> get _subs {
+    final t = widget.topics.where((t) => (t['des_cat_id'] as num).toInt() == _catId);
+    if (t.isEmpty) return const [];
+    return List<Map<String, dynamic>>.from(t.first['sub_categories'] as List? ?? const []);
+  }
+
+  String _subLabel(Map<String, dynamic> s) {
+    final en = '${s['name_en'] ?? ''}'.trim();
+    final bn = '${s['name_bn'] ?? ''}'.trim();
+    if (en.isNotEmpty && bn.isNotEmpty) return '$en · $bn';
+    return en.isNotEmpty ? en : bn;
+  }
+
+  Future<void> _post() async {
+    if (_catId == null) {
+      setState(() => _error = 'Choose a topic.');
+      return;
+    }
+    setState(() {
+      _posting = true;
+      _error = null;
+    });
+    try {
+      final req = http.MultipartRequest('POST', Uri.parse('$host/api/banners/post/'))
+        ..headers.addAll(authHeadersMultipart())
+        ..fields['des_cat_id'] = '$_catId'
+        ..fields['des'] = _caption.text.trim()
+        ..fields['listing_type'] = widget.listingType
+        ..fields['listing_id'] = widget.listingId
+        ..files.add(http.MultipartFile.fromBytes('image', widget.png,
+            filename: 'banner_${widget.listingType}_${widget.listingId}.png'));
+      if (_subId != null) req.fields['des_sub_cat_id'] = '$_subId';
+      final streamed = await req.send();
+      final body = await streamed.stream.bytesToString();
+      Map<String, dynamic> data;
+      try {
+        data = json.decode(body) as Map<String, dynamic>;
+      } catch (_) {
+        data = {'success': false, 'message': 'Server returned ${streamed.statusCode}'};
+      }
+      if (!mounted) return;
+      if (streamed.statusCode == 201 && data['success'] == true) {
+        Navigator.of(context).pop(data);
+      } else {
+        setState(() {
+          _posting = false;
+          _error = '${data['message'] ?? data['detail'] ?? 'Posting failed (${streamed.statusCode})'}';
+        });
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _posting = false;
+        _error = '$e';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final blocked = widget.account == null;
+    return AlertDialog(
+      title: const Text('Share as post'),
+      content: SizedBox(
+        width: 560,
+        child: SingleChildScrollView(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, mainAxisSize: MainAxisSize.min, children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Image.memory(widget.png, fit: BoxFit.contain),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: blocked ? const Color(0xFFFEF2F2) : accentLight,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(children: [
+                Icon(blocked ? Icons.error_outline_rounded : Icons.verified_rounded,
+                    size: 18, color: blocked ? errorColor : accentColor),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    blocked
+                        ? (widget.accountError ?? 'Official AaramBD account is not configured.')
+                        : 'Posting as ${widget.account!['name']} (user #${widget.account!['user_id']}) · '
+                            'goes live immediately · no notification',
+                    style: TextStyle(fontSize: 12.5, color: blocked ? errorColor : textPrimary),
+                  ),
+                ),
+              ]),
+            ),
+            const SizedBox(height: 14),
+            DropdownButtonFormField<int>(
+              value: _catId,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Topic *', isDense: true, border: OutlineInputBorder()),
+              items: [
+                for (final t in widget.topics)
+                  DropdownMenuItem<int>(
+                    value: (t['des_cat_id'] as num).toInt(),
+                    child: Text('${t['des_cat_name']}${t['active'] == false ? ' (inactive)' : ''}'),
+                  ),
+              ],
+              onChanged: _posting
+                  ? null
+                  : (v) => setState(() {
+                        _catId = v;
+                        _subId = null;
+                        _error = null;
+                      }),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<int?>(
+              key: ValueKey(_catId),
+              value: _subId,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                  labelText: 'Sub-category (optional)', isDense: true, border: OutlineInputBorder()),
+              items: [
+                const DropdownMenuItem<int?>(value: null, child: Text('None')),
+                for (final s in _subs)
+                  DropdownMenuItem<int?>(
+                    value: (s['des_sub_cat_id'] as num).toInt(),
+                    child: Text(_subLabel(s), overflow: TextOverflow.ellipsis),
+                  ),
+              ],
+              onChanged: _posting ? null : (v) => setState(() => _subId = v),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _caption,
+              enabled: !_posting,
+              minLines: 4,
+              maxLines: 8,
+              maxLength: 2000,
+              decoration: const InputDecoration(
+                labelText: 'Caption (post text)',
+                alignLabelWithHint: true,
+                border: OutlineInputBorder(),
+              ),
+            ),
+            if (_error != null)
+              Text(_error!, style: const TextStyle(color: errorColor, fontSize: 13)),
+          ]),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _posting ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton.icon(
+          onPressed: _posting || blocked ? null : _post,
+          style: FilledButton.styleFrom(backgroundColor: accentColor),
+          icon: _posting
+              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : const Icon(Icons.send_rounded, size: 18),
+          label: Text(_posting ? 'Posting…' : 'Post now'),
+        ),
+      ],
+    );
+  }
 }
 
 // ── Shared card pieces ──────────────────────────────────────────────────────

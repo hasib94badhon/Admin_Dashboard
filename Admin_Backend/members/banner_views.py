@@ -234,3 +234,174 @@ def banner_image(request):
     response = HttpResponse(data, content_type=ctype)
     response['Cache-Control'] = 'private, max-age=3600'
     return response
+
+
+# ── Share a banner as a post in the `description` table ────────────────────
+#
+# Posts are published from the official AaramBD app account, go live
+# immediately and send NO push notifications.
+#
+# .env settings (Django):
+#   AARAMBD_OFFICIAL_USER_ID   users.user_id of the official "AaramBD" app account
+#   FTP_UPLOAD_DIR             FTP folder served at https://aarambd.com/upload/
+#                              (same value as FTP_DIRECTORY in the Flask .env)
+#   FTP_HOST / FTP_USER / FTP_PASS  already used for category logos
+
+import datetime as _dt
+import io as _io
+from ftplib import FTP as _FTP
+
+from decouple import config as _config
+
+MAX_POST_IMAGE_BYTES = 8 * 1024 * 1024
+MAX_CAPTION_CHARS = 2000
+
+
+def _official_account(cursor):
+    """Returns (account_dict or None, error message or None)."""
+    raw = str(_config('AARAMBD_OFFICIAL_USER_ID', default='')).strip()
+    if not raw.isdigit():
+        return None, 'AARAMBD_OFFICIAL_USER_ID is not set in the admin backend .env.'
+    rows = _rows(cursor, 'SELECT user_id, name, status FROM users WHERE user_id = %s', [int(raw)])
+    if not rows:
+        return None, f'Official account user_id {raw} does not exist.'
+    acc = rows[0]
+    if str(acc.get('status')) in ('0', 'False'):
+        return None, f'Official account user_id {raw} is blocked (status = 0).'
+    return {'user_id': acc['user_id'], 'name': _clean(acc['name']) or 'AaramBD'}, None
+
+
+@api_view(['GET'])
+@page_access('banners')
+def banner_topics(request):
+    """Topics (des_cat) and sub-categories for the Share dialog, plus the
+    account the post will be published from."""
+    with connection.cursor() as cursor:
+        cats = _rows(cursor, """
+            SELECT des_cat_id, des_cat_name, des_cat_status
+            FROM des_cat ORDER BY des_cat_id
+        """)
+        subs = _rows(cursor, """
+            SELECT des_sub_cat_id, des_cat_id, name_en, name_bn, emoji, sort_order
+            FROM des_sub_cat ORDER BY des_cat_id, sort_order, des_sub_cat_id
+        """)
+        account, account_error = _official_account(cursor)
+
+    by_cat = {}
+    for s in subs:
+        by_cat.setdefault(s['des_cat_id'], []).append({
+            'des_sub_cat_id': s['des_sub_cat_id'],
+            'name_en': _clean(s['name_en']),
+            'name_bn': _clean(s['name_bn']),
+            'emoji': s['emoji'] or '',
+        })
+    return Response({
+        'account': account,
+        'account_error': account_error,
+        'topics': [
+            {
+                'des_cat_id': c['des_cat_id'],
+                'des_cat_name': _clean(c['des_cat_name']),
+                'active': str(c['des_cat_status']) not in ('0', 'False'),
+                'sub_categories': by_cat.get(c['des_cat_id'], []),
+            }
+            for c in cats
+        ],
+    })
+
+
+def _is_png(data):
+    return data[:8] == b'\x89PNG\r\n\x1a\n'
+
+
+@api_view(['POST'])
+@page_access('banners')
+def banner_post(request):
+    """multipart/form-data:
+        image           PNG exported from Banner Studio (required)
+        des_cat_id      topic (required)
+        des_sub_cat_id  sub-category (optional, must belong to the topic)
+        des             caption / post text (optional)
+        listing_type    'service' | 'shop'   (for the file name and log)
+        listing_id      listing id           (for the file name and log)
+    """
+    image = request.FILES.get('image')
+    if image is None:
+        return Response({'success': False, 'message': 'Banner image is missing.'}, status=400)
+    if image.size > MAX_POST_IMAGE_BYTES:
+        return Response({'success': False, 'message': 'Banner image is larger than 8 MB.'}, status=400)
+    data = image.read()
+    if not _is_png(data):
+        return Response({'success': False, 'message': 'Banner image must be a PNG.'}, status=400)
+
+    des_cat_id = str(request.data.get('des_cat_id') or '').strip()
+    des_sub_cat_id = str(request.data.get('des_sub_cat_id') or '').strip()
+    caption = str(request.data.get('des') or '').strip()
+    listing_type = str(request.data.get('listing_type') or '').strip().lower()
+    listing_id = str(request.data.get('listing_id') or '').strip()
+
+    if not des_cat_id.isdigit():
+        return Response({'success': False, 'message': 'Choose a topic.'}, status=400)
+    if des_sub_cat_id and not des_sub_cat_id.isdigit():
+        return Response({'success': False, 'message': 'Invalid sub-category.'}, status=400)
+    if len(caption) > MAX_CAPTION_CHARS:
+        return Response({'success': False,
+                         'message': f'Caption is longer than {MAX_CAPTION_CHARS} characters.'}, status=400)
+    if listing_type not in _TYPES:
+        listing_type = 'banner'
+    if not listing_id.isdigit():
+        listing_id = '0'
+
+    with connection.cursor() as cursor:
+        if not _rows(cursor, 'SELECT 1 AS ok FROM des_cat WHERE des_cat_id = %s', [int(des_cat_id)]):
+            return Response({'success': False, 'message': 'Topic not found.'}, status=400)
+        if des_sub_cat_id and not _rows(
+                cursor, 'SELECT 1 AS ok FROM des_sub_cat WHERE des_sub_cat_id = %s AND des_cat_id = %s',
+                [int(des_sub_cat_id), int(des_cat_id)]):
+            return Response({'success': False,
+                             'message': 'That sub-category does not belong to the chosen topic.'}, status=400)
+        account, account_error = _official_account(cursor)
+        if account is None:
+            return Response({'success': False, 'message': account_error}, status=409)
+
+    # 1) Upload the PNG to the same folder Flask uses for post photos.
+    stamp = _dt.datetime.now().strftime('%Y%m%d%H%M%S')
+    filename = f'banner_{listing_type}_{listing_id}_{stamp}.png'
+    upload_dir = _config('FTP_UPLOAD_DIR', default='/domains/aarambd.com/public_html/upload')
+    try:
+        with _FTP(_config('FTP_HOST'), timeout=30) as ftp:
+            ftp.login(user=_config('FTP_USER'), passwd=_config('FTP_PASS'))
+            ftp.cwd(upload_dir)
+            ftp.storbinary(f'STOR {filename}', _io.BytesIO(data))
+    except Exception as e:  # noqa: BLE001
+        logging.error('banner_post FTP upload failed: %s', e)
+        return Response({'success': False, 'message': f'Image upload failed: {e}'}, status=502)
+    photo_url = UPLOAD_BASE + filename
+
+    # 2) Insert the post exactly like the app does: live, visible, no notification.
+    try:
+        with connection.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO description
+                    (user_id, time, des, des_cat_id, des_sub_cat_id, des_photo,
+                     des_view, des_com, status, special_note, is_hidden)
+                VALUES (%s, NOW(), %s, %s, %s, %s, 0, 0, 'live', '', 0)
+            """, [account['user_id'], caption, int(des_cat_id),
+                  int(des_sub_cat_id) if des_sub_cat_id else None, photo_url])
+            des_id = cursor.lastrowid
+    except Exception as e:  # noqa: BLE001
+        logging.error('banner_post insert failed (uploaded %s): %s', filename, e)
+        return Response({'success': False, 'message': f'Saving the post failed: {e}'}, status=500)
+
+    admin = getattr(request, 'user', None)
+    logging.info('[BannerPost] des_id=%s by admin=%s listing=%s:%s topic=%s/%s photo=%s',
+                 des_id, getattr(admin, 'username', '?'), listing_type, listing_id,
+                 des_cat_id, des_sub_cat_id or '-', photo_url)
+
+    return Response({
+        'success': True,
+        'message': 'Posted',
+        'des_id': des_id,
+        'photo_url': photo_url,
+        'posted_as': account,
+    }, status=201)
