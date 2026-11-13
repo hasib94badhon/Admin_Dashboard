@@ -23,6 +23,7 @@ class MenuController extends GetxController {
     switch (itemName) {
       case overviewPageDisplayName:       return Icons.dashboard_rounded;
       case summaryPageDisplayName:        return Icons.insights_rounded;
+      case bannerPageDisplayName:         return Icons.badge_rounded;
       case driversPageDisplayName:        return Icons.category_rounded;
       case clientsPageDisplayName:        return Icons.people_rounded;
       case InsertPageDisplayName:         return Icons.upload_file_rounded;

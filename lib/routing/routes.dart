@@ -6,6 +6,9 @@ const overviewPageRoute = "/overview";
 const summaryPageDisplayName = "Business Summary";
 const summaryPageRoute = "/summary";
 
+const bannerPageDisplayName = "Banner Studio";
+const bannerPageRoute = "/banners";
+
 const driversPageDisplayName = "Categories";
 const driversPageRoute = "/drivers";
 
@@ -65,6 +68,7 @@ class MenuItem {
 List<MenuItem> sideMenuItemRoutes = [
   MenuItem(overviewPageDisplayName, overviewPageRoute),
   MenuItem(summaryPageDisplayName, summaryPageRoute),
+  MenuItem(bannerPageDisplayName, bannerPageRoute),
   MenuItem(driversPageDisplayName, driversPageRoute),
   MenuItem(clientsPageDisplayName, clientsPageRoute),
   MenuItem(InsertPageDisplayName, InsertPageRoute),
@@ -87,6 +91,7 @@ List<MenuItem> sideMenuItemRoutes = [
 const Map<String, String> pageKeyForRoute = {
   overviewPageRoute: 'overview',
   summaryPageRoute: 'summary',
+  bannerPageRoute: 'banners',
   driversPageRoute: 'drivers',
   clientsPageRoute: 'clients',
   InsertPageRoute: 'insert',
@@ -106,7 +111,7 @@ const Map<String, String> pageKeyForRoute = {
 // Every page key a superadmin can grant, in menu order, with its display
 // label -- drives the checkbox list on the Manage Admins page.
 const List<String> allPageKeys = [
-  'overview', 'summary', 'drivers', 'clients', 'insert', 'appstatus',
+  'overview', 'summary', 'banners', 'drivers', 'clients', 'insert', 'appstatus',
   'referral', 'deactivation', 'deleted_accounts', 'service', 'shop',
   'subscribers', 'reactions', 'notifications', 'terms', 'contact',
 ];
@@ -114,6 +119,7 @@ const List<String> allPageKeys = [
 const Map<String, String> pageKeyLabels = {
   'overview': overviewPageDisplayName,
   'summary': summaryPageDisplayName,
+  'banners': bannerPageDisplayName,
   'drivers': driversPageDisplayName,
   'clients': clientsPageDisplayName,
   'insert': InsertPageDisplayName,

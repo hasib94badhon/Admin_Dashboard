@@ -1,6 +1,7 @@
 from django.urls import path,include
 from .views import *
 from .summary_views import summary_stats
+from .banner_views import banner_categories, banner_listings, banner_image
 from django.conf import settings
 from django.conf.urls.static import static
 
@@ -33,6 +34,9 @@ urlpatterns = [
 
     path('api/dashboard-stats/', dashboard_stats, name='dashboard_stats'),
     path('api/summary-stats/', summary_stats, name='summary-stats'),
+    path('api/banners/categories/', banner_categories, name='banner-categories'),
+    path('api/banners/listings/', banner_listings, name='banner-listings'),
+    path('api/banners/image/', banner_image, name='banner-image'),
     path('api/deactivated-users/', deactivated_users, name='deactivated_users'),
     path('api/deleted-accounts/', list_deleted_accounts, name='deleted-accounts'),
     path('api/users/<int:pk>/delete/', admin_delete_user, name='admin-delete-user'),
