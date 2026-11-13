@@ -3,6 +3,9 @@ const rootRoute = "/";
 const overviewPageDisplayName = "Overview";
 const overviewPageRoute = "/overview";
 
+const summaryPageDisplayName = "Business Summary";
+const summaryPageRoute = "/summary";
+
 const driversPageDisplayName = "Categories";
 const driversPageRoute = "/drivers";
 
@@ -61,6 +64,7 @@ class MenuItem {
 // always superuser-only, never toggle-able.
 List<MenuItem> sideMenuItemRoutes = [
   MenuItem(overviewPageDisplayName, overviewPageRoute),
+  MenuItem(summaryPageDisplayName, summaryPageRoute),
   MenuItem(driversPageDisplayName, driversPageRoute),
   MenuItem(clientsPageDisplayName, clientsPageRoute),
   MenuItem(InsertPageDisplayName, InsertPageRoute),
@@ -82,6 +86,7 @@ List<MenuItem> sideMenuItemRoutes = [
 // allowed_pages (from the login response). Superadmins bypass this entirely.
 const Map<String, String> pageKeyForRoute = {
   overviewPageRoute: 'overview',
+  summaryPageRoute: 'summary',
   driversPageRoute: 'drivers',
   clientsPageRoute: 'clients',
   InsertPageRoute: 'insert',
@@ -101,13 +106,14 @@ const Map<String, String> pageKeyForRoute = {
 // Every page key a superadmin can grant, in menu order, with its display
 // label -- drives the checkbox list on the Manage Admins page.
 const List<String> allPageKeys = [
-  'overview', 'drivers', 'clients', 'insert', 'appstatus',
+  'overview', 'summary', 'drivers', 'clients', 'insert', 'appstatus',
   'referral', 'deactivation', 'deleted_accounts', 'service', 'shop',
   'subscribers', 'reactions', 'notifications', 'terms', 'contact',
 ];
 
 const Map<String, String> pageKeyLabels = {
   'overview': overviewPageDisplayName,
+  'summary': summaryPageDisplayName,
   'drivers': driversPageDisplayName,
   'clients': clientsPageDisplayName,
   'insert': InsertPageDisplayName,

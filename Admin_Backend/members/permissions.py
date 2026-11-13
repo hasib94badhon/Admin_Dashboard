@@ -16,7 +16,7 @@ from rest_framework.permissions import BasePermission
 # Mirrors the route set in lib/routing/routes.dart. 'staff_admin' itself is
 # never toggled here -- managing other admins is always superuser-only.
 PAGE_KEYS = [
-    'overview', 'drivers', 'clients', 'insert', 'appstatus',
+    'overview', 'summary', 'drivers', 'clients', 'insert', 'appstatus',
     'referral', 'deactivation', 'deleted_accounts', 'service', 'shop',
     'subscribers', 'reactions', 'terms', 'contact', 'notifications',
 ]

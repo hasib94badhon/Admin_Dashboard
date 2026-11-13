@@ -22,6 +22,7 @@ class MenuController extends GetxController {
   IconData returnIconDataFor(String itemName) {
     switch (itemName) {
       case overviewPageDisplayName:       return Icons.dashboard_rounded;
+      case summaryPageDisplayName:        return Icons.insights_rounded;
       case driversPageDisplayName:        return Icons.category_rounded;
       case clientsPageDisplayName:        return Icons.people_rounded;
       case InsertPageDisplayName:         return Icons.upload_file_rounded;

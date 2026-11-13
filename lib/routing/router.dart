@@ -3,6 +3,7 @@ import 'package:flutter_web_dashboard/pages/403/not_authorized.dart';
 import 'package:flutter_web_dashboard/pages/clients/clients.dart';
 import 'package:flutter_web_dashboard/pages/drivers/drivers.dart';
 import 'package:flutter_web_dashboard/pages/overview/overview.dart';
+import 'package:flutter_web_dashboard/pages/summary/summary_page.dart';
 import 'package:flutter_web_dashboard/routing/routes.dart';
 import 'package:flutter_web_dashboard/pages/insert/insert_page.dart';
 import 'package:flutter_web_dashboard/pages/appstatus/app_status_page.dart';
@@ -23,6 +24,8 @@ Route<dynamic> generateRoute(RouteSettings settings) {
   switch (settings.name) {
     case overviewPageRoute:
       return _guarded(overviewPageRoute, const OverviewPage());
+    case summaryPageRoute:
+      return _guarded(summaryPageRoute, const SummaryPage());
     case driversPageRoute:
       return _guarded(driversPageRoute, const DriversPage());
     case clientsPageRoute:
